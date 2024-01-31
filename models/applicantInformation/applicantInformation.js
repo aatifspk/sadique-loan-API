@@ -7,6 +7,8 @@ const applicantInformationSchema = new mongoose.Schema({
 
     userId: { type: ObjectId, ref: "user" },
 
+    loanFormId : {type :ObjectId, ref :"applicantLoanDetail"},
+
     // personal details
 
     firstName : {type :String , required : true},
@@ -24,7 +26,7 @@ const applicantInformationSchema = new mongoose.Schema({
     propertyOwnerShip :  {type :String , default : null},  // option "owned" or "rent"
 
 
-    // Job details
+    // Job details 
 
     jobTitle :  {type :String , default : null},
     placeOfWork :  {type :String , default : null},
@@ -35,7 +37,6 @@ const applicantInformationSchema = new mongoose.Schema({
 
     // indentity details
 
-    
     typeOfId1 : {type :String , default : null},
     typeOfId2 : {type :String , default : null},
     typeOfId3 : {type :String , default : null},
@@ -45,6 +46,26 @@ const applicantInformationSchema = new mongoose.Schema({
     panNumber :  {type :String , default : null},
     voterNumber :  {type :String , default : null},
     drivingLicenseNumber :  {type :String , default : null},
+
+    adharFrontImage :  {type :String , default : null},
+    adharBackImage :  {type :String , default : null},
+
+    panFrontImage :  {type :String , default : null},
+    panBackImage :  {type :String , default : null},
+
+    voterFrontImage :  {type :String , default : null},
+    voterBackImage :  {type :String , default : null},
+
+    drivingFrontImage :  {type :String , default : null},
+    drivingBackImage :  {type :String , default : null},
+
+    // phot and signature
+
+    photo :  {type :String , default : null},
+    signature :  {type :String , default : null},
+
+
+
 
     deletedAt: {
         type: Date,

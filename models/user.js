@@ -39,6 +39,8 @@ const userSchema = new mongoose.Schema({
     adharCardImage : { type : String, default : null},
     drivingLicenseImage : { type : String, default : null}, 
 
+    profileCreated : {type : Boolean, default:false},
+
     // created by
 
     createdBy : {type : String, default : null},

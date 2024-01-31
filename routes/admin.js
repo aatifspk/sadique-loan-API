@@ -67,6 +67,10 @@ router.delete("/deleteClinet/:id",auth.checkAdminAuth, adminController.softDelet
 // restore client
 router.put("/clientRestore/:id",auth.checkAdminAuth, adminController.restoreClient);
 
+// permanent delete client
+router.delete("/permanentDeleteClient/:id",auth.checkAdminAuth, adminController.deleteClient);
+
+
 //###---------- Client routes ends here------------
 
 
@@ -134,6 +138,21 @@ router.delete("/permanentDeleteProduct/:id",auth.checkAdminAuth, adminController
 
 // product active inactive
 router.post("/productInActive/:id",auth.checkAdminAuth,adminController.productInActive);
+
+
+// create product information
+router.post('/createproductInfo', auth.checkAdminAuth,adminController.createProductInformation);
+
+// get particualr product info
+router.get('/getParticularProductInfo/:id', auth.checkAdminAuth,adminController.getParticularProductInfo);
+
+// get product info List
+router.get('/getProductinfoList', auth.checkAdminAuth,adminController.getProductInfoList);
+
+
+
+
+
 
 //###----------- Product routes ends here-------------
 

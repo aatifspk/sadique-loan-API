@@ -9,7 +9,9 @@ const PRIVATEKEY = process.env.PRIVATEKEY;
 const userModel = require("../models/user");
 const Roles = require("../models/roles/roles");
 const Branch = require("../models/branch");
-const Product = require("../models/Product/product")
+const Product = require("../models/Product/product");
+const ProductInfo = require("../models/productInfo/productInfo")
+
 
 const statusCode = require('../utils/http-status-code');
 const errorMessage = require('../languages/message');
@@ -173,7 +175,7 @@ exports.createClient = async (req, res) => {
 
         const { branchId, email, phone, firstName, lastName, city, state, password, ownerId, roleId, create } = req.body;
 
-        const clientExist = await userModel.findOne({ email: email});
+        const clientExist = await userModel.findOne({ email: email });
 
 
         if (clientExist && create) {
@@ -250,7 +252,7 @@ exports.getParticularClinet = async (req, res) => {
         const id = req.params.id;
 
 
-       
+
         const clientExist = await userModel.find({ _id: id }).populate("branchId").populate("Role");
 
         if (clientExist) {
@@ -276,32 +278,104 @@ exports.getParticularClinet = async (req, res) => {
 }
 
 // get list of clients
+// exports.listClients = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 4
+
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: null,
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const clients = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Clients!',
+//             count: clients.length,
+//             listClients: clients,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new code for filter list
 exports.listClients = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 4
-         
+        const roleId = parseInt(req.query.roleId) || 4;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: null,
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -311,25 +385,19 @@ exports.listClients = async (req, res, next, listAll = "false", isActive = "true
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
-                    $or: [
-                        {
-                            $expr: {
-                                $regexMatch: {
-                                    input: { $concat: ['$firstName', ' ', '$lastName'] },
-                                    regex: searchText,
-                                    options: 'i',
-                                },
-                            },
+                    $expr: {
+                        $regexMatch: {
+                            input: { $concat: ['$firstName', ' ', '$lastName'] },
+                            regex: searchText,
+                            options: 'i',
                         },
-                    ],
+                    },
                 },
             ];
         }
-
 
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
@@ -337,14 +405,14 @@ exports.listClients = async (req, res, next, listAll = "false", isActive = "true
 
         console.log("whereCondition", whereCondition);
 
-        const clients = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [clients, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
             message: 'List Clients!',
-            count: clients.length,
+            count: count,
             listClients: clients,
         });
     } catch (error) {
@@ -372,13 +440,13 @@ exports.clientInActive = async (req, res) => {
 
         const clinet = await userModel.findById(id);
 
-        console.log("clinet",clinet);
+        console.log("clinet", clinet);
 
         if (clinet) {
 
             if (status) {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status });
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -393,7 +461,7 @@ exports.clientInActive = async (req, res) => {
 
             } else {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status })
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -507,33 +575,137 @@ exports.restoreClient = async (req, res) => {
     }
 };
 
+// permanent delete client
+exports.deleteClient = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const admin = req.user;
+
+        if (admin.roleId !== 1) {
+            return res.status(statusCode.Unauthorized).send({
+                message: "Unauthorize to access this."
+            });
+        }
+
+        const deletedClient = await userModel.deleteOne({ _id: id });
+
+        if (deletedClient.deletedCount === 0) {
+            return res.status(statusCode.NotFound).json({
+                message: "Client not found.",
+            });
+        }
+
+        return res.status(statusCode.OK).json({
+            message: "Client permanently deleted successfully.",
+        });
+    } catch (error) {
+        console.error("Error:", error);
+        return res.status(statusCode.InternalServerError).json({
+            message: errorMessage.lblInternalServerError,
+        });
+    }
+};
+
 // get soft deleted clinet with filter
+// exports.listSoftDeletedClients = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 4
+
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: { $ne: null },
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const clients = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Clients!',
+//             count: clients.length,
+//             listClients: clients,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new code for filtered soft deleted client list
 exports.listSoftDeletedClients = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 4
-
+        const roleId = parseInt(req.query.roleId) || 4;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: { $ne: null },
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -543,7 +715,6 @@ exports.listSoftDeletedClients = async (req, res, next, listAll = "false", isAct
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
@@ -562,21 +733,20 @@ exports.listSoftDeletedClients = async (req, res, next, listAll = "false", isAct
             ];
         }
 
-
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
         }
 
         console.log("whereCondition", whereCondition);
 
-        const clients = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [clients, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List Clients!',
-            count: clients.length,
+            message: 'List Soft-Deleted Clients!',
+            count: count,
             listClients: clients,
         });
     } catch (error) {
@@ -724,14 +894,14 @@ exports.getParticularEmployee = async (req, res) => {
     try {
 
         const id = req.params.id;
-       
+
         const employeeExist = await userModel.find({ _id: id }).populate("branchId").populate("Role");
 
         if (employeeExist) {
 
             return res.status(statusCode.OK).send({
                 message: "Employee found successfully.",
-                data: clientExist,
+                data: employeeExist,
             })
 
         } else {
@@ -750,31 +920,103 @@ exports.getParticularEmployee = async (req, res) => {
 }
 
 // get employee list with filter
+// exports.listEmployees = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 3
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: null,
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const employees = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Clients!',
+//             count: employees.length,
+//             listEmployees: employees,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new get employee list with filter
 exports.listEmployees = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 3
+        const roleId = parseInt(req.query.roleId) || 3;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: null,
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -784,7 +1026,6 @@ exports.listEmployees = async (req, res, next, listAll = "false", isActive = "tr
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
@@ -803,21 +1044,20 @@ exports.listEmployees = async (req, res, next, listAll = "false", isActive = "tr
             ];
         }
 
-
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
         }
 
         console.log("whereCondition", whereCondition);
 
-        const employees = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [employees, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List Clients!',
-            count: employees.length,
+            message: 'List Employees!',
+            count: count,
             listEmployees: employees,
         });
     } catch (error) {
@@ -886,13 +1126,13 @@ exports.employeeInActive = async (req, res) => {
 
         const employee = await userModel.findById(id);
 
-        console.log("employee",employee);
+        console.log("employee", employee);
 
         if (employee) {
 
             if (status) {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status });
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -907,7 +1147,7 @@ exports.employeeInActive = async (req, res) => {
 
             } else {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status })
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -1022,32 +1262,105 @@ exports.restoreEmployee = async (req, res) => {
 };
 
 // get soft deleted employee with filter
+// exports.listSoftDeletedEmployee = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 3
+
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: { $ne: null },
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const employees = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Clients!',
+//             count: employees.length,
+//             listEmployees: employees,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+
+// new get soft deleted employee with filter
 exports.listSoftDeletedEmployee = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 3
-
+        const roleId = parseInt(req.query.roleId) || 3;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: { $ne: null },
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -1057,7 +1370,6 @@ exports.listSoftDeletedEmployee = async (req, res, next, listAll = "false", isAc
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
@@ -1076,21 +1388,20 @@ exports.listSoftDeletedEmployee = async (req, res, next, listAll = "false", isAc
             ];
         }
 
-
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
         }
 
         console.log("whereCondition", whereCondition);
 
-        const employees = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [employees, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List Clients!',
-            count: employees.length,
+            message: 'List Soft-Deleted Employees!',
+            count: count,
             listEmployees: employees,
         });
     } catch (error) {
@@ -1099,7 +1410,6 @@ exports.listSoftDeletedEmployee = async (req, res, next, listAll = "false", isAc
         });
     }
 };
-
 
 
 //### --------employee controller ends here----------
@@ -1113,7 +1423,7 @@ exports.createProduct = async (req, res) => {
 
     try {
 
-        const {id} = req.body
+        const { id } = req.body
 
         if (id) {
 
@@ -1242,14 +1552,57 @@ exports.getParticularProduct = async (req, res) => {
 }
 
 // get products with filter
+// exports.listProducts = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+
+//         let whereCondition = {
+//             productStatus: active === "true",
+//             deletedAt: null
+//         };
+
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { productName: { $regex: searchText, $options: 'i' } },
+//                 { rateTyep: { $regex: searchText, $options: 'i' } },
+//                 { recoveryType: { $regex: searchText, $options: 'i' } },
+//             ];
+//         }
+
+
+//         const products = await Product.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Products!',
+//             count: products.length,
+//             listProducts: products,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new get products with filter
 exports.listProducts = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
         const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
 
         let whereCondition = {
@@ -1257,7 +1610,6 @@ exports.listProducts = async (req, res, next, listAll = "false", isActive = "tru
             deletedAt: null
         };
 
-        
         if (searchText) {
             whereCondition.$or = [
                 { productName: { $regex: searchText, $options: 'i' } },
@@ -1266,15 +1618,14 @@ exports.listProducts = async (req, res, next, listAll = "false", isActive = "tru
             ];
         }
 
-
-        const products = await Product.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [products, count] = await Promise.all([
+            Product.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            Product.countDocuments(whereCondition),
+        ]);
 
         return res.json({
             message: 'List Products!',
-            count: products.length,
+            count: count,
             listProducts: products,
         });
     } catch (error) {
@@ -1365,22 +1716,64 @@ exports.restoreProduct = async (req, res) => {
 };
 
 // get soft deleted products with filter
+// exports.listSoftDeletedProducts = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+
+//         let whereCondition = {
+//             productStatus: active === "true",
+//             deletedAt: { $ne: null }
+//         };
+
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { productName: { $regex: searchText, $options: 'i' } },
+//                 { rateTyep: { $regex: searchText, $options: 'i' } },
+//                 { recoveryType: { $regex: searchText, $options: 'i' } },
+//             ];
+//         }
+
+
+//         const products = await Product.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Products!',
+//             count: products.length,
+//             listProducts: products,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new soft deleted product with filter
 exports.listSoftDeletedProducts = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
         const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
 
         let whereCondition = {
             productStatus: active === "true",
-            deletedAt: {$ne:null}
+            deletedAt: { $ne: null }
         };
 
-        
         if (searchText) {
             whereCondition.$or = [
                 { productName: { $regex: searchText, $options: 'i' } },
@@ -1389,15 +1782,14 @@ exports.listSoftDeletedProducts = async (req, res, next, listAll = "false", isAc
             ];
         }
 
-
-        const products = await Product.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [products, count] = await Promise.all([
+            Product.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            Product.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List Products!',
-            count: products.length,
+            message: 'List Soft-Deleted Products!',
+            count: count,
             listProducts: products,
         });
     } catch (error) {
@@ -1459,13 +1851,13 @@ exports.productInActive = async (req, res) => {
 
         const product = await Product.findById(id);
 
-        console.log("product",product);
+        console.log("product", product);
 
         if (product) {
 
             if (status) {
                 const update = await Product.updateOne({ _id: id }, { productStatus: status });
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -1480,7 +1872,7 @@ exports.productInActive = async (req, res) => {
 
             } else {
                 const update = await Product.updateOne({ _id: id }, { productStatus: status })
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -1505,6 +1897,180 @@ exports.productInActive = async (req, res) => {
         }
 
 
+
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// create product information
+exports.createProductInformation = async (req, res) => {
+
+    try {
+
+        const { id , productId} = req.body;
+
+
+        if (id) {
+
+            const productInfoExists = await ProductInfo.findById(id);
+
+            if (productInfoExists) {
+
+
+                const isInfoExist = await ProductInfo.find({productId: productId });
+
+                if(isInfoExist.length == 0){
+                    return res.status(statusCode.BadRequest).send({
+                        message: "Please provide correct Product Id"
+                    })
+                }
+
+
+                const object = req.body;
+
+                const { id, ...rest } = object
+
+                const updateproductInfo = await ProductInfo.updateOne({
+                    _id: id
+                }, { ...rest });
+
+                if (updateproductInfo) {
+
+                    return res.status(statusCode.OK).send({
+                        message: "Product Info updated successfully.."
+                    })
+
+                } else {
+
+                    return res.status(statusCode.ExpectationFailed).send({
+                        message: "Error occured in updating the product Info..."
+                    })
+
+                }
+
+            } else {
+                return res.status(statusCode.BadRequest).send({
+                    message: "Product Info not found.."
+                })
+            }
+
+
+        } else {
+
+            const object = req.body;
+
+            const { id, title, description, termsAndCondition, productId } = object;
+            const product = await Product.findById(productId);
+
+            if (product) {
+
+                const productID = product._id;
+
+                const isInfoExist = await ProductInfo.find({productId: productId });
+
+                if(isInfoExist.length > 0){
+
+                    return res.status(statusCode.BadRequest).send({
+                        message: "Product Info already exists with this product Id..."
+                    })
+
+                }
+
+                const create = await ProductInfo.create({
+                    productId : productID,
+                    title, description, termsAndCondition,
+                });
+
+                if (create) {
+
+                    return res.status(statusCode.OK).send({
+                        message: "Product Info created successfully.."
+                    })
+
+                } else {
+
+                    return res.status(statusCode.ExpectationFailed).send({
+                        message: "Error occured in creating the product Info..."
+                    })
+
+                }
+
+            }else{
+                return res.status(statusCode.BadRequest).send({
+                    message: "Product not found.."
+                })
+            }
+
+
+
+        }
+
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+// get particular product info
+exports.getParticularProductInfo = async (req, res) => {
+
+    try {
+
+        const id = req.params.id;
+        const productExist = await ProductInfo.find({ _id: id })
+
+        if (productExist) {
+
+            return res.status(statusCode.OK).send({
+                message: "Product Info found successfully.",
+                data: productExist,
+            })
+
+        } else {
+
+            return res.status(statusCode.NotFound).send({
+                data: null,
+                message: "Product Info data not found."
+            })
+        }
+
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// get product Info list
+exports.getProductInfoList = async (req, res) => {
+
+    try {
+
+        const productExist = await ProductInfo.find().populate("productId");
+
+        if (productExist) {
+
+            return res.status(statusCode.OK).send({
+                message: "Product Info List found successfully.",
+                data: productExist,
+            })
+
+        } else {
+
+            return res.status(statusCode.NotFound).send({
+                data: null,
+                message: "Product Info data not found."
+            })
+        }
 
     } catch (error) {
         console.log("error", error);
@@ -1540,7 +2106,7 @@ exports.createAgent = async (req, res) => {
             })
 
         }
-        
+
 
         if (agentExists) {
 
@@ -1684,13 +2250,13 @@ exports.agentInActive = async (req, res) => {
 
         const agent = await userModel.findById(id);
 
-        console.log("agent",agent);
+        console.log("agent", agent);
 
         if (agent) {
 
             if (status) {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status });
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -1705,7 +2271,7 @@ exports.agentInActive = async (req, res) => {
 
             } else {
                 const update = await userModel.updateOne({ _id: id }, { isActive: status })
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -1820,31 +2386,103 @@ exports.restoreAgent = async (req, res) => {
 };
 
 // get agent with filter
+// exports.listAgents = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 2;
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: null,
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const agents = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Agents!',
+//             count: agents.length,
+//             listAgents: agents,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new agents with filter
 exports.listAgents = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 2;
+        const roleId = parseInt(req.query.roleId) || 2;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: null,
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -1854,7 +2492,6 @@ exports.listAgents = async (req, res, next, listAll = "false", isActive = "true"
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
@@ -1873,21 +2510,20 @@ exports.listAgents = async (req, res, next, listAll = "false", isActive = "true"
             ];
         }
 
-
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
         }
 
         console.log("whereCondition", whereCondition);
 
-        const agents = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [agents, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
             message: 'List Agents!',
-            count: agents.length,
+            count: count,
             listAgents: agents,
         });
     } catch (error) {
@@ -1898,32 +2534,104 @@ exports.listAgents = async (req, res, next, listAll = "false", isActive = "true"
 };
 
 // get soft deleted agents with filter
+// exports.listSoftDeletedAgents = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         // const { roleId } = req.user;
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+//         const branchId = req.query.branchId ? req.query.branchId : null;
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+//         const roleId = req.query.roleId ? req.query.roleId : 2;
+
+
+//         let whereCondition = {
+//             isActive: active === "true",
+//             deletedAt: { $ne: null },
+//             roleId: roleId
+//         };
+
+//         if (branchId) {
+
+//             whereCondition = {
+//                 ...whereCondition,
+//                 branchId: branchId
+//             }
+
+//         }
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { firstName: { $regex: searchText, $options: 'i' } },
+//                 { lastName: { $regex: searchText, $options: 'i' } },
+//                 { email: { $regex: searchText, $options: 'i' } },
+//                 { phone: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//                 {
+//                     $or: [
+//                         {
+//                             $expr: {
+//                                 $regexMatch: {
+//                                     input: { $concat: ['$firstName', ' ', '$lastName'] },
+//                                     regex: searchText,
+//                                     options: 'i',
+//                                 },
+//                             },
+//                         },
+//                     ],
+//                 },
+//             ];
+//         }
+
+
+//         if (!searchText) {
+//             delete whereCondition.$or; // Remove $or condition if searchText is not provided
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const agents = await userModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List Clients!',
+//             count: agents.length,
+//             listAgents: agents,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+// new get soft deleted agents with filter
 exports.listSoftDeletedAgents = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
-        // const { roleId } = req.user;
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
-        const branchId  = req.query.branchId ? req.query.branchId : null;
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const branchId = req.query.branchId || null;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
-        const roleId = req.query.roleId ? req.query.roleId : 2;
-
+        const roleId = parseInt(req.query.roleId) || 2;
 
         let whereCondition = {
-            isActive: active === "true",
+            // isActive: active === "true",
             deletedAt: { $ne: null },
-            roleId : roleId
+            roleId: roleId
         };
 
-        if(branchId){
-
-            whereCondition = {
-                ...whereCondition,
-                branchId : branchId
-            }
-
+        if (branchId) {
+            whereCondition.branchId = branchId;
         }
 
         if (searchText) {
@@ -1933,7 +2641,6 @@ exports.listSoftDeletedAgents = async (req, res, next, listAll = "false", isActi
                 { email: { $regex: searchText, $options: 'i' } },
                 { phone: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
                 {
@@ -1952,21 +2659,20 @@ exports.listSoftDeletedAgents = async (req, res, next, listAll = "false", isActi
             ];
         }
 
-
         if (!searchText) {
             delete whereCondition.$or; // Remove $or condition if searchText is not provided
         }
 
         console.log("whereCondition", whereCondition);
 
-        const agents = await userModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [agents, count] = await Promise.all([
+            userModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            userModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List Clients!',
-            count: agents.length,
+            message: 'List Soft-Deleted Agents!',
+            count: count,
             listAgents: agents,
         });
     } catch (error) {
@@ -2149,21 +2855,76 @@ exports.updateBranch = async (req, res) => {
 }
 
 // get branches with filterationd
+// exports.listBranches = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         const { roleId } = req.user;
+//         // const searchText = req.query.keyword ? req.query.keyword : '';
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+
+//         console.log("req guery", req.query);
+
+//         const whereCondition = {
+//             status: active === "true",
+//             deletedAt: null
+//         };
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { branchName: { $regex: searchText, $options: 'i' } },
+//                 { branchVisibleName: { $regex: searchText, $options: 'i' } },
+//                 { branchCode: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//             ];
+//         }
+
+//         if (all === "false" && roleId === 2) {
+//             whereCondition.deletedAt = null;
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const branches = await branchModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List branches!',
+//             count: branches.length,
+//             listBranches: branches,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+
+// new code for list branches
 exports.listBranches = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
         const { roleId } = req.user;
-        // const searchText = req.query.keyword ? req.query.keyword : '';
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
 
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
 
         const whereCondition = {
-            status: active === "true",
-            deletedAt : null
+            // status: active === "true",
+            deletedAt: null
         };
 
         if (searchText) {
@@ -2172,7 +2933,6 @@ exports.listBranches = async (req, res, next, listAll = "false", isActive = "tru
                 { branchVisibleName: { $regex: searchText, $options: 'i' } },
                 { branchCode: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
             ];
@@ -2184,14 +2944,14 @@ exports.listBranches = async (req, res, next, listAll = "false", isActive = "tru
 
         console.log("whereCondition", whereCondition);
 
-        const branches = await branchModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [branches, count] = await Promise.all([
+            branchModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            branchModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
             message: 'List branches!',
-            count: branches.length,
+            count: count,
             listBranches: branches,
         });
     } catch (error) {
@@ -2217,7 +2977,8 @@ exports.getBranchs = async (req, res) => {
         if (branchsList && branchsList.length > 0) {
             return res.status(statusCode.OK).send({
                 message: "Branchs list found successfully.",
-                branchs: branchsList
+                branchs: branchsList,
+                count : branchsList.length
             })
         } else {
             return res.status(statusCode.NotFound).send({
@@ -2271,7 +3032,7 @@ exports.branchInActive = async (req, res) => {
             } else {
                 const update = await branchModel.updateOne({ _id: id }, { status: status })
 
-                console.log("update",update);
+                console.log("update", update);
 
                 if (update) {
                     return res.status(statusCode.OK).send({
@@ -2467,21 +3228,74 @@ exports.restoreBranch = async (req, res) => {
 };
 
 // get soft deleted branches with filterationd
+// exports.listSoftDeletedBranches = async (req, res, next, listAll = "false", isActive = "true") => {
+//     try {
+//         const { roleId } = req.user;
+//         // const searchText = req.query.keyword ? req.query.keyword : '';
+//         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+
+//         const all = req.query.all ? req.query.all : listAll;
+//         const active = req.query.active ? req.query.active : isActive;
+//         const page = req.query.page ? req.query.page : 1;
+//         const limit = req.query.perPage ? req.query.perPage : 10;
+//         const skip = (page - 1) * limit;
+
+//         const whereCondition = {
+//             status: active === "true",
+//             deletedAt: { $ne: null }
+//         };
+
+//         if (searchText) {
+//             whereCondition.$or = [
+//                 { branchName: { $regex: searchText, $options: 'i' } },
+//                 { branchVisibleName: { $regex: searchText, $options: 'i' } },
+//                 { branchCode: { $regex: searchText, $options: 'i' } },
+//                 { locality: { $regex: searchText, $options: 'i' } },
+//                 // { openingDate: new Date(searchText) },
+//                 { city: { $regex: searchText, $options: 'i' } },
+//                 { state: { $regex: searchText, $options: 'i' } },
+//             ];
+//         }
+
+//         if (all === "false" && roleId === 2) {
+//             whereCondition.deletedAt = null;
+//         }
+
+//         console.log("whereCondition", whereCondition);
+
+//         const branches = await branchModel.find(whereCondition)
+//             .skip(parseInt(skip))
+//             .limit(parseInt(limit))
+//             .sort({ _id: 'desc' });
+
+//         return res.json({
+//             message: 'List branches!',
+//             count: branches.length,
+//             listBranches: branches,
+//         });
+//     } catch (error) {
+//         res.status(statusCode.InternalServerError).send({
+//             message: error.message || errorMessage.lblInternalServerError,
+//         });
+//     }
+// };
+
+
+// new code for soft deleted branch list
 exports.listSoftDeletedBranches = async (req, res, next, listAll = "false", isActive = "true") => {
     try {
         const { roleId } = req.user;
-        // const searchText = req.query.keyword ? req.query.keyword : '';
         const searchText = req.query.keyword ? req.query.keyword.trim() : '';
 
-        const all = req.query.all ? req.query.all : listAll;
-        const active = req.query.active ? req.query.active : isActive;
-        const page = req.query.page ? req.query.page : 1;
-        const limit = req.query.perPage ? req.query.perPage : 10;
+        const all = req.query.all || listAll;
+        const active = req.query.active || isActive;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * limit;
 
         const whereCondition = {
             status: active === "true",
-            deletedAt : { $ne: null }
+            deletedAt: { $ne: null }
         };
 
         if (searchText) {
@@ -2490,7 +3304,6 @@ exports.listSoftDeletedBranches = async (req, res, next, listAll = "false", isAc
                 { branchVisibleName: { $regex: searchText, $options: 'i' } },
                 { branchCode: { $regex: searchText, $options: 'i' } },
                 { locality: { $regex: searchText, $options: 'i' } },
-                // { openingDate: new Date(searchText) },
                 { city: { $regex: searchText, $options: 'i' } },
                 { state: { $regex: searchText, $options: 'i' } },
             ];
@@ -2502,14 +3315,14 @@ exports.listSoftDeletedBranches = async (req, res, next, listAll = "false", isAc
 
         console.log("whereCondition", whereCondition);
 
-        const branches = await branchModel.find(whereCondition)
-            .skip(parseInt(skip))
-            .limit(parseInt(limit))
-            .sort({ _id: 'desc' });
+        const [branches, count] = await Promise.all([
+            branchModel.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            branchModel.countDocuments(whereCondition),
+        ]);
 
         return res.json({
-            message: 'List branches!',
-            count: branches.length,
+            message: 'List soft-deleted branches!',
+            count: count,
             listBranches: branches,
         });
     } catch (error) {

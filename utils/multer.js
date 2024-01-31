@@ -12,6 +12,15 @@ if(!fs.existsSync('./public/profile')){
     fs.mkdirSync('./public/profile')
 }
 
+// create signature folder
+if(!fs.existsSync('./public/signaturesAndPhoto')){
+    fs.mkdirSync('./public/signaturesAndPhoto')
+}
+
+
+
+
+
 
 // image filter
 const imageFilter = (req, file, cb) => {
@@ -51,6 +60,28 @@ const uploadProfile = multer({
     fileFilter: imageFilter
 });
 
+
+
+// upload photo and signature
+
+const combinedStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/signaturesAndPhoto');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+
+const uploadCombined = multer({
+    storage: combinedStorage,
+    limits: {
+        fileSize: 1024 * 1024, // 1 MB
+        files: 2 // Allow uploading both signature and photo
+    },
+    fileFilter: imageFilter
+});
 
 
 
@@ -124,3 +155,4 @@ exports.uploadSpace = uploadSpace;
 exports.uploadImage = uploadImage;
 exports.uploadStorageType = uploadStorageTypeImage;
 exports.uploadChatImage = uploadChatImage;
+exports.uploadCombined = uploadCombined;

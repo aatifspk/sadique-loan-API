@@ -6,23 +6,21 @@ const applicantLoanDetailScrema = new mongoose.Schema(
 
     {
 
-        userId: { type: ObjectId, ref: "user" },
+        userId: { type: ObjectId, ref: "user" }, // applicant user id
 
 
         loanName: { type: String, default: null },
+        loanId: { type: String, default: null },
         rateOfInterest: { type: Number, required: true },
         rateTyep: {type : String, default : null },
         recoveryType :  {type : String, default : null },
         processingFeePercent: { type: Number, required: true },
         processingFeeAmount: { type: Number, required: true },
 
-
-
         amountDisburse : { type: Number, default: null },
         amountSanctioned : { type: Number, default: null },
         emiAmount: { type: Number, default: null },
         NoOfEmi: { type: Number, default: null },
-
 
 
         createdAt: {

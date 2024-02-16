@@ -1,7 +1,7 @@
 const express = require("express");
 let router = express.Router();
 const {
-    uploadProfile, uploadCombined
+    uploadProfile, uploadCombined, uploadCombinedAdhar, uploadCombinedPan, uploadCombinedVoter, uploadCombinedLicense
 } = require('../utils/multer');
 
 const multer = require('multer');
@@ -128,17 +128,17 @@ router.post('/editApplicantGuarantorInfo/:id', auth.checkUserAuth, userControlle
 // get guarantor info
 router.get('/getsubmitedApplicantGuarantorInfo/:id', auth.checkUserAuth, userController.getSubmitedApplicantGuarantorInfo);
 
+// guarantor photo and signature 
+router.post('/uploadPhotoAndSignatureOfGuarantor', auth.checkUserAuth, (req, res, next) => {
 
-
-
+    uploadCombined.array("file")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updatePhotoAndSignatureOfGuarantor);
 
 
 
 // ##-----applicant guarantor info ends here
-
-
-
-// ##-----applicant photo and signature starts here
 
 const handleFileUploadError = (err, res, next) => {
     if (err) {
@@ -158,6 +158,84 @@ const handleFileUploadError = (err, res, next) => {
     next();
 };
 
+
+// upload adhar back and front of guarantor
+router.post('/uploadAdharBackAndFrontOfGuarantor', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedAdhar.array("adhar")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateAdharBackAndFrontOfGuarantor);
+
+
+// upload pan back and front of guarantor
+router.post('/uploadPanBackAndFrontOfGuarantor', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedPan.array("pan")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updatePanBackAndFrontOfGuarantor);
+
+
+// upload voter back and front of guarantor
+router.post('/uploadVoterBackAndFrontOfGuarantor', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedVoter.array("voter")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateVoterBackAndFrontOfGuarantor);
+
+// upload driving license back and front of guarantor
+router.post('/uploadLicenseBackAndFrontOfGuarantor', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedLicense.array("license")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateLicenseBackAndFront);
+
+
+
+
+// upload adhar back and front of client
+router.post('/uploadAdharBackAndFront', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedAdhar.array("adhar")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateAdharBackAndFront);
+
+
+
+// upload pan back and front of client
+router.post('/uploadPanBackAndFront', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedPan.array("pan")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updatePanBackAndFront);
+
+
+
+
+// upload voter back and front of client
+router.post('/uploadVoterBackAndFront', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedVoter.array("voter")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateVoterBackAndFront);
+
+
+
+// upload driving license back and front of client
+router.post('/uploadLicenseBackAndFront', auth.checkUserAuth, (req, res, next) => {
+
+    uploadCombinedLicense.array("license")(req, res, (err) => {
+        handleFileUploadError(err, res, next);
+    });
+}, userController.updateLicenseBackAndFront);
+
+
 // upload photo and signature of client
 router.post('/uploadPhotoAndSignature', auth.checkUserAuth, (req, res, next) => {
 
@@ -167,21 +245,15 @@ router.post('/uploadPhotoAndSignature', auth.checkUserAuth, (req, res, next) => 
 }, userController.updatePhotoAndSignature);
 
 
-// upload photo and signature of guarantor
-router.post('/uploadPhotoAndSignatureOfGuarantor', auth.checkUserAuth, (req, res, next) => {
 
-    uploadCombined.array("file")(req, res, (err) => {
-        handleFileUploadError(err, res, next);
-    });
-}, userController.updatePhotoAndSignature);
+// final submit of loan from
+router.post('/finalSubmitOfLoanForm', auth.checkUserAuth, userController.finalSubmitOfLoanForm);
 
 
 
 
 
 
-
-// ##-----applicant phot and signature ends here
 
 
 

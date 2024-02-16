@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     createdBy : {type:ObjectId, ref : "user"},
     firstName : {type :String , required : true},
     lastName : {type :String},
+    middleName : {type :String},
     fatherName : {type :String,default : null},
     motherName : {type :String,default : null},
     gender : {type :String,default : null},
@@ -18,11 +19,13 @@ const userSchema = new mongoose.Schema({
     email : {type :String , required : true},
     optionalEmail : {type :String , default : null},
     phone : {type :String , default : null},
+    officePhone : {type :String , default : null},
     emergencyPhone : {type :String,default : null},
     city :  {type :String , default : null},    
     state :  {type :String , default : null},
     country :  {type :String , default : "India"},
     ZipCode :  {type :String , default : null},
+    address : {type :String , default : null},
     password : {type :String , required : true},
     adharNumber :  {type :String , default : null},
     panNumber :  {type :String , default : null},
@@ -31,6 +34,9 @@ const userSchema = new mongoose.Schema({
     tc : {type :Boolean , required : true},
     isVerified : {type : Boolean, default:false},
     isActive : {type : Boolean, default:true},
+
+    // designation
+    designation : {type :String , default : null},
 
     // upload section
     profileImage : { type : String, default : null},
@@ -42,14 +48,14 @@ const userSchema = new mongoose.Schema({
     profileCreated : {type : Boolean, default:false},
 
     // created by
+    // createdBy : {type : String, default : null},
 
-    createdBy : {type : String, default : null},
     deletedAt: {
         type: Date,
         default: null,
     },
 
-    
+    contactOwner : {type : String, default : null},
 
 
     //  id and otp section

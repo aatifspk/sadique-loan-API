@@ -11,7 +11,8 @@ const ApplicantForm = require("../models/applicantLoanDetails/applicantLoanDetai
 const ApplicantInfo = require("../models/applicantInformation/applicantInformation");
 const BankInfo = require("../models/bankInformation/bankInformation");
 const GuarantorInfo = require("../models/guaranter/guaranter");
-const LoanFormTracking = require("../models/loanFormTracking/loanFormTracking")
+const LoanFormTracking = require("../models/loanFormTracking/loanFormTracking");
+const SuperAdminNotification = require("../models/superAdminNotification/superAdminNotification")
 
 
 
@@ -318,11 +319,14 @@ exports.updateProfile = async (req, res) => {
     try {
 
         const user = req.user;
-        const { firstName, lastName, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode, email } = req.body;
+        const { firstName,middleName, lastName,password, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode,address, designation, email } = req.body;
         // let profileImageName = null;
+
+        console.log("req.body", req.body);
 
         let profileObject = {
             firstName: firstName,
+            middleName : middleName,
             lastName: lastName,
             fatherName: fatherName,
             motherName: motherName,
@@ -335,17 +339,20 @@ exports.updateProfile = async (req, res) => {
             city: city,
             state: state,
             ZipCode: ZipCode,
+            address : address,
+            designation : designation,
             profileCreated: true
         }
 
-        if (req.file && req.file.filename ) {
+        if (req.file && req.file.filename) {
             // profileImageName = req.file.filename
             profileObject = {
                 ...profileObject,
-                profileImage : req.file.filename
+                profileImage: req.file.filename
 
             }
-        } 
+        }
+
         // else {
         //     return res.status(statusCode.BadRequest).send({
         //         message: "image Not Provided"
@@ -361,13 +368,42 @@ exports.updateProfile = async (req, res) => {
             };
         }
 
+        if(password){
+
+            const hash = bcrypt.hashSync(password, 10);
+            profileObject = {
+                ...profileObject,
+                password: hash
+            }
+        }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
-            const update = await userModel.updateOne({ email: user.email }, {...profileObject})
+            const update = await userModel.updateOne({ email: user.email }, { ...profileObject });
+            console.log("update", update);
             if (update) {
+                const profile = await userModel.findOne({ email: user.email })
                 return res.status(statusCode.OK).send({
-                    message: "Profile updated successfully."
+                    message: "Profile updated successfully.",
+                    data: {
+                        firstName: profile?.firstName,
+                        lastName: profile?.lastName,
+                        middleName: profile?.middleName,
+                        fatherName: profile?.fatherName,
+                        motherName: profile?.motherName,
+                        gender: profile?.gender,
+                        dateOfBirth: profile?.dateOfBirth,
+                        maritalStatus: profile?.maritalStatus,
+                        optionalEmail: profile?.optionalEmail,
+                        emergencyPhone: profile?.emergencyPhone,
+                        phone: profile?.phone,
+                        city: profile?.city,
+                        state: profile?.state,
+                        ZipCode: profile?.ZipCode,
+                        address : profile?.address,
+                        designation : profile?.designation,
+                        profileImage: profile?.profileImage
+                    }
                 })
             } else {
                 return res.status(statusCode.ExpectationFailed).send({
@@ -398,13 +434,12 @@ exports.getProfile = async (req, res) => {
         const user = await userModel.findById(id);
 
         if (user) {
-            console.log("user", user);
 
-            const { profileImage, firstName, lastName, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode, email } = user
+            const { profileImage, firstName, lastName, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode, address, designation, email, profileCreated } = user
 
-            if (profileImage && dateOfBirth && gender && maritalStatus) {
+            if (profileCreated) {
 
-                const data = { profileImage, firstName, lastName, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode, email }
+                const data = { profileImage, firstName, lastName, fatherName, motherName, gender, dateOfBirth, maritalStatus, optionalEmail, emergencyPhone, phone, city, state, ZipCode, email, address, designation }
 
                 return res.status(statusCode.OK).send({
                     data: data,
@@ -535,7 +570,7 @@ exports.submitLoanDetailsForm = async (req, res) => {
             const formSubmit = await ApplicantForm.create(dataObject);
 
             const trackingDetails = {
-
+                productId : req.body.productId,
                 userId: userExist._id,
                 loanFormId: formSubmit._id,
                 stepAt: "1"
@@ -1190,7 +1225,7 @@ exports.getSubmitedApplicantGuarantorInfo = async (req, res) => {
 
 
 
-// ##-----applicant guarantor info ends here
+// ##-----applicant's guarantor info ends here
 
 
 // ##----applicant photo and signature starts here
@@ -1202,7 +1237,6 @@ exports.updatePhotoAndSignature = async (req, res) => {
         const user = req.user;
 
         const { loanFormId, userId } = req.body
-
 
         let profileImageName = [];
 
@@ -1231,7 +1265,7 @@ exports.updatePhotoAndSignature = async (req, res) => {
             if (update.acknowledged) {
 
                 const trackingDetails = {
-                    stepAt: "5"
+                    stepAt: "10"
                 }
 
                 const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
@@ -1262,8 +1296,548 @@ exports.updatePhotoAndSignature = async (req, res) => {
 // ##-----applicant phot and signature ends here
 
 
+// ###---- upload identity of guarantor starts here.
 
-// ##----guarantor phot and signature starts here
+
+// ##----guarantor adhar back and front 
+exports.updateAdharBackAndFrontOfGuarantor = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, adharNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await GuarantorInfo.updateOne({ loanFormId: loanFormId }, {
+                adharFrontImage: profileImageName[0],
+                adharBackImage: profileImageName[1],
+                adharNumber: adharNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "6"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Guarantor Adhar Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Guarantor Adhar Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+// ##----guarantor pan back and front 
+exports.updatePanBackAndFrontOfGuarantor = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, panNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await GuarantorInfo.updateOne({ loanFormId: loanFormId }, {
+                panFrontImage: profileImageName[0],
+                panBackImage: profileImageName[1],
+                panNumber: panNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "7"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Guarantor Pan Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Guarantor Pan Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+// ##----guarantor voter back and front 
+exports.updateVoterBackAndFrontOfGuarantor = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, voterNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await GuarantorInfo.updateOne({ loanFormId: loanFormId }, {
+                voterFrontImage: profileImageName[0],
+                voterBackImage: profileImageName[1],
+                voterNumber: voterNumber
+
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "8"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Guarantor Voter Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Guarantor Voter Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+// ##----guarantor driving license back and front 
+exports.updateLicenseBackAndFront = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, drivingLicenseNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await GuarantorInfo.updateOne({ loanFormId: loanFormId }, {
+                drivingFrontImage: profileImageName[0],
+                drivingBackImage: profileImageName[1],
+                drivingLicenseNumber: drivingLicenseNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "9"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Guarantor Driving License uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Guarantor Driving License"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// ###---- upload identity of guarantor ends here.
+
+
+
+// ###---- upload identity of client starts here.
+
+
+// ##----applicant adhar back and front 
+exports.updateAdharBackAndFront = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, adharNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await ApplicantInfo.updateOne({ loanFormId: loanFormId }, {
+                adharFrontImage: profileImageName[0],
+                adharBackImage: profileImageName[1],
+                adharNumber: adharNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "6"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Adhar Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Adhar Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// ##----applicant pan card back and front 
+exports.updatePanBackAndFront = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, panNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await ApplicantInfo.updateOne({ loanFormId: loanFormId }, {
+                panFrontImage: profileImageName[0],
+                panBackImage: profileImageName[1],
+                panNumber: panNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "7"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Pan Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Pan Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// ##----applicant voter card back and front 
+exports.updateVoterBackAndFront = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, voterNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await ApplicantInfo.updateOne({ loanFormId: loanFormId }, {
+                voterFrontImage: profileImageName[0],
+                voterBackImage: profileImageName[1],
+                voterNumber: voterNumber
+
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "8"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Voter Card uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Voter Card"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+// ##----applicant Driving License back and front 
+exports.updateLicenseBackAndFront = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const { loanFormId, userId, drivingLicenseNumber } = req.body
+
+        let profileImageName = [];
+
+
+        if (req.files && req.files.length > 1) {
+
+            for (let index = 0; index < req.files.length; index++) {
+                const element = req.files[index];
+                profileImageName.push(element.filename)
+            }
+
+        } else {
+            return res.status(statusCode.BadRequest).send({
+                message: "image Not Provided"
+            })
+        }
+
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const update = await ApplicantInfo.updateOne({ loanFormId: loanFormId }, {
+                drivingFrontImage: profileImageName[0],
+                drivingBackImage: profileImageName[1],
+                drivingLicenseNumber: drivingLicenseNumber
+            });
+
+            if (update.acknowledged) {
+
+                const trackingDetails = {
+                    stepAt: "9"
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+
+                return res.status(statusCode.OK).send({
+                    message: "Driving License uploaded successfully..."
+                })
+
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error Occured while uploading Driving License"
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+    } catch (error) {
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+    }
+}
+
+
+
+// ###---- upload identity of client ends here.
+
+
+// ###----guarantor phot and signature starts here
 
 exports.updatePhotoAndSignatureOfGuarantor = async (req, res) => {
 
@@ -1302,7 +1876,7 @@ exports.updatePhotoAndSignatureOfGuarantor = async (req, res) => {
             if (update.acknowledged) {
 
                 const trackingDetails = {
-                    stepAt: "6"
+                    stepAt: "5"
                 }
 
                 const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
@@ -1330,17 +1904,125 @@ exports.updatePhotoAndSignatureOfGuarantor = async (req, res) => {
     }
 }
 
-
-// ##----guarantor phot and signature ends here
-
+// ###----guarantor phot and signature ends here
 
 
+// ## final submit of loan form
+exports.finalSubmitOfLoanForm = async (req, res) => {
+
+    try {
+
+        const { loanFormId, userId } = req.body
+        const user = req.user;
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const fromExist = await ApplicantForm.findById(loanFormId);
+
+            if (fromExist) {
+
+                const trackingDetails = {
+                    stepAt: "4",
+                    isStepsCompleted: true,
+                    fromSubmittedOn: new Date()
+                }
+
+                const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+
+                if (update.acknowledged) {
+                    console.log("fromExist", fromExist);
+
+                    const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
+                    const firstName = applicant.firstName ? applicant.firstName : "";
+                    const lastName = applicant.lastName ? applicant.lastName : "";
+                    const fullName = firstName + " " + lastName;
+
+                    const idObject = {
+                        userId: fromExist.userId,
+                        loanFormId: loanFormId
+                    };
 
 
 
+                    function formatCustomDate(date) {
+                        const options = {
+                            weekday: 'long', // Full weekday name (e.g., "Monday")
+                            day: 'numeric',  // Numeric day of the month (e.g., 03)
+                            month: 'short',  // Short month name (e.g., "Feb")
+                            year: 'numeric', // Full year (e.g., 2024)
+                            hour: 'numeric', // Hour in 12-hour clock format (e.g., 11)
+                            minute: 'numeric', // Minute (e.g., 13)
+                            hour12: true,    // Use 12-hour clock format (e.g., "am" or "pm")
+                        };
+                        return date.toLocaleString('en-US', options);
+                    }
 
+                    const bodyString = `An application for ${fromExist.loanName} has been registered by ${fullName !== "" ? fullName.toUpperCase() : ""} on ${formatCustomDate(new Date())} from ${applicant.city ? applicant?.applicant : ""} `;
 
+                    const dataObject = {
+                        header: "New Loan Application Registered.",
+                        subHeader: `Application Submitted by ${fullName !== "" ? fullName.toUpperCase() : ""}`,
+                        body: bodyString,
+                        importantId: JSON.stringify(idObject),
+                    }
 
+                    const user = await userModel.find({ roleId: 1 }, '_id');
+
+                    for (let index = 0; index < user.length; index++) {
+                        const id = user[index]._id;
+                        const createNotification = await SuperAdminNotification.create({
+                            ...dataObject,
+                            userId: id,
+                            notificationType: 1
+                        });
+                    }
+
+                    const mailOptions = {
+                        from: "aatif13698@gmail.com",
+                        to: applicant.email,
+                        subject: "Loan Applicantion Submitted Successfully...",
+                        template: "loanFormSubmit",
+                        context: {
+                            email: applicant.email,
+                            name: applicant.firstName + " " + applicant.lastName,
+                            loanName: fromExist?.loanName.toUpperCase(),
+                            applyingDate : formatCustomDate(new Date()) 
+                        },
+                    };
+
+                    await mailSender(mailOptions)
+
+                    return res.status(statusCode.OK).send({
+                        message: "Your Loan Application Has Been Successfully Submitted...."
+                    })
+
+                }
+
+            } else {
+
+                return res.status(statusCode.NotFound).send({
+                    message: "Loan Form Not Found...",
+                })
+
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+
+    } catch (error) {
+
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+
+    }
+
+}
 
 
 

@@ -11,25 +11,32 @@ const producthScrema = new mongoose.Schema(
         AmountRangeStart: { type: Number, default: null },
         AmountRangeEnd: { type: Number, default: null },
         rateOfInterest: { type: Number, required: true },
-        rateTyep: {type : String, default : "day"},
+        rateTyep: {type : String, default : "day"}, // day, week, month, year
         processChargeInclude: {  type: Boolean, default: false  },
         processFeePercent: { type: Number, required: true },
-        recoveryType: { type: String, default: null },
-        productStatus: { type: Boolean, default: true },
-        holidayExclude: { type: Boolean, default: false },
+        recoveryType: { type: String, default: null }, // day, week, month, year
+        productStatus: { type: Boolean, default: true },  // not for frontend
+        holidayExclude: { type: Boolean, default: false },  // yes , no
         emiAmount: { type: Number, default: null },
         NoOfEmi: { type: Number, default: null },
-        gstchargeInclude: { type: Boolean, default: false },
+        gstchargeInclude: { type: Boolean, default: false },  // yes , no
         gstChargePercent: { type: Number, default: null },
 
 
 
         // documents required
-        aharRequired: { type: Boolean, default: false },
-        panRequired: { type: Boolean, default: false },
-        voterRequired: { type: Boolean, default: false },
-        drivingLicenseRequired: { type: Boolean, default: false },
-        propertyPaperRequired: { type: Boolean, default: false },
+        aharRequired: { type: Boolean, default: false },    // yes , no
+        panRequired: { type: Boolean, default: false },  // yes , no
+        voterRequired: { type: Boolean, default: false },  // yes , no
+        drivingLicenseRequired: { type: Boolean, default: false },  // yes , no
+        propertyPaperRequired: { type: Boolean, default: false },  // yes , no
+
+        // document mendetory
+        aharMandatory: { type: Boolean, default: false },    // yes , no
+        panMandatory: { type: Boolean, default: false },  // yes , no
+        voterMandatory: { type: Boolean, default: false },  // yes , no
+        drivingLicenseMandatory: { type: Boolean, default: false },  // yes , no
+        propertyPaperMandatory: { type: Boolean, default: false },  // yes , no
 
 
 

@@ -22,7 +22,7 @@ const city = require("./models/City/city")
 const app = express();
 
 
-app.use(cors())
+app.use(cors());
 app.use(express.json())
 app.use(express.static('public'))
 app.use(bodyPrser.json());
@@ -32,6 +32,7 @@ app.use(bodyPrser.json());
 app.use("/api", welcomeRouter.router);
 app.use("/api/client", clientRoute.router);
 app.use("/api/admin", adminRoutes.router);
+require("./routes/superAdminNotification")(app);
 
 // console.log("DATABASE_URL",DATABASE_URL);
 ConnectDb(DATABASE_URL);
@@ -69,14 +70,14 @@ const productData = [
     AmountRangeEnd: 5000,
     rateOfInterest: 0.5,
     rateTyep: "day",
-    // rateType can be day, week, month, year and whole.
+    // rateType can be day, week, month, year
 
-    processChargeInclude: false,
+    processChargeInclude: true,
     processFeePercent: 10,
-    recoveryType: "daily",
+    recoveryType: "day",
     productStatus: true,
-    holidayExclude: false,
-    gstchargeInclude: false,
+    holidayExclude: true,
+    gstchargeInclude: true,
     NoOfEmi:21,
 
     // documents required
@@ -92,12 +93,12 @@ const productData = [
     AmountRangeStart: 10000,
     AmountRangeEnd: 10000,
     rateOfInterest: 40 ,
-    rateTyep: "whole",
-    // rateType can be day, week, month, year and whole.
+    rateTyep: "day",
+    // rateType can be day, week, month, year 
 
     processChargeInclude: false,
     processFeePercent: 8,
-    recoveryType: "weekly",
+    recoveryType: "day",
     productStatus: true,
     holidayExclude: false,
     gstchargeInclude: false,

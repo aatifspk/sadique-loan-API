@@ -19,6 +19,32 @@ if(!fs.existsSync('./public/signaturesAndPhoto')){
 
 
 
+// create adhar folder
+if(!fs.existsSync('./public/adhar')){
+    fs.mkdirSync('./public/adhar')
+}
+
+
+// create pan card folder
+if(!fs.existsSync('./public/panCard')){
+    fs.mkdirSync('./public/panCard')
+}
+
+
+
+// create voter card folder
+if(!fs.existsSync('./public/voterCard')){
+    fs.mkdirSync('./public/voterCard')
+}
+
+
+// create voter card folder
+if(!fs.existsSync('./public/drivingLicense')){
+    fs.mkdirSync('./public/drivingLicense')
+}
+
+
+
 
 
 
@@ -82,6 +108,96 @@ const uploadCombined = multer({
     },
     fileFilter: imageFilter
 });
+
+
+
+// upload adhar back and front
+
+const combinedStorageAdhar = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/adhar');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+
+const uploadCombinedAdhar = multer({
+    storage: combinedStorageAdhar,
+    limits: {
+        fileSize: 1024 * 1024, // 1 MB
+        files: 2 // Allow uploading both signature and photo
+    },
+    fileFilter: imageFilter
+});
+
+
+// upload pan back and front
+const combinedStoragePan = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/panCard');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+
+const uploadCombinedPan = multer({
+    storage: combinedStoragePan,
+    limits: {
+        fileSize: 1024 * 1024, // 1 MB
+        files: 2 // Allow uploading both signature and photo
+    },
+    fileFilter: imageFilter
+});
+
+
+
+// upload voter back and front
+const combinedStorageVoter = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/voterCard');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+
+const uploadCombinedVoter = multer({
+    storage: combinedStorageVoter,
+    limits: {
+        fileSize: 1024 * 1024, // 1 MB
+        files: 2 // Allow uploading both signature and photo
+    },
+    fileFilter: imageFilter
+});
+
+
+
+// upload driving license back and front
+const combinedStorageLicense = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/drivingLicense');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+
+const uploadCombinedLicense = multer({
+    storage: combinedStorageLicense,
+    limits: {
+        fileSize: 1024 * 1024, // 1 MB
+        files: 2 // Allow uploading both signature and photo
+    },
+    fileFilter: imageFilter
+});
+
+
 
 
 
@@ -156,3 +272,7 @@ exports.uploadImage = uploadImage;
 exports.uploadStorageType = uploadStorageTypeImage;
 exports.uploadChatImage = uploadChatImage;
 exports.uploadCombined = uploadCombined;
+exports.uploadCombinedAdhar = uploadCombinedAdhar;
+exports.uploadCombinedPan = uploadCombinedPan;
+exports.uploadCombinedVoter = uploadCombinedVoter;
+exports.uploadCombinedLicense = uploadCombinedLicense;

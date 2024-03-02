@@ -18,7 +18,8 @@ const GuarantorInfo = require("../models/guaranter/guaranter");
 const LoanFormTracking = require("../models/loanFormTracking/loanFormTracking");
 const SuperAdminNotification = require("../models/superAdminNotification/superAdminNotification");
 const AgentNotification = require("../models/agentNotification/agentNotification");
-const ClinetsUnderAgent = require("../models/clientsUnderAgents/clientsUnderAgents")
+const ClinetsUnderAgent = require("../models/clientsUnderAgents/clientsUnderAgents");
+const EmiSheet = require("../models/loanRecoveryRecord/loanRecoveryRecord")
 
 
 
@@ -26,6 +27,11 @@ const fs = require('fs');
 const ejs = require('ejs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+// const instance = require('../app');
+const Razorpay = require('razorpay') ;
+const crypto =  require('crypto')
+
+
 
 
 
@@ -113,7 +119,7 @@ exports.signIn = async (req, res) => {
     } catch (error) {
         console.log("error", error);
         return res.status(statusCode.InternalServerError).send({
-            message: errorMessage.lblInternalServerError
+            message: "Network Error"
         })
 
     }
@@ -125,7 +131,7 @@ exports.signInByOtp = async (req, res) => {
 
     try {
 
-        const { email, otp } = req.body;
+        const { email, otp, rememberMe } = req.body;
         const userExist = await userModel.findOne({ email: email }).populate('Role');
 
         console.log("userExist", userExist);
@@ -145,9 +151,28 @@ exports.signInByOtp = async (req, res) => {
                     })
                 }
                 if (otp == userExist?.verificationOtp) {
-                    const token = jwt.sign({ email: req.body.email }, PRIVATEKEY);
+
+                    let expiresIn = '1d';
+
+                    if (rememberMe) {
+                        expiresIn = '7d'; // If remember me is checked, expiry will be 7 days
+                    }
+
+                    const token = jwt.sign({ email: req.body.email }, PRIVATEKEY, { expiresIn });
+                    // const token = jwt.sign({ email: req.body.email }, PRIVATEKEY);
+
+                    let expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000; // 1 day in milliseconds
+
+                    if(rememberMe){
+
+                        expiryTime = new Date().getTime() + 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+                    }
+
+
                     return res.status(statusCode.OK).send({
                         token: token,
+                        expiryTime : expiryTime, 
                         adminInfo: userExist,
                         message: "login Success."
                     })
@@ -214,7 +239,7 @@ exports.createClient = async (req, res) => {
             };
 
 
-            if(password){
+            if (password) {
 
                 const hash = bcrypt.hashSync(password, 10);
                 profileObject = {
@@ -226,7 +251,7 @@ exports.createClient = async (req, res) => {
 
 
 
-            const updateClient = await userModel.updateOne({ email: email }, {...profileObject});
+            const updateClient = await userModel.updateOne({ email: email }, { ...profileObject });
 
             if (updateClient) {
                 return res.status(statusCode.OK).send({
@@ -246,7 +271,7 @@ exports.createClient = async (req, res) => {
                 email: email,
                 firstName: firstName,
                 lastName: lastName,
-                middleName : middleName,
+                middleName: middleName,
                 city: city,
                 state: state,
                 phone: phone,
@@ -402,7 +427,7 @@ exports.listClients = async (req, res, next, listAll = "false", isActive = "true
         const skip = (page - 1) * limit;
         const roleId = parseInt(req.query.roleId) || 4;
 
-        console.log("roleId",roleId);
+        console.log("roleId", roleId);
 
         let whereCondition = {
             // isActive: active === "true",
@@ -416,7 +441,7 @@ exports.listClients = async (req, res, next, listAll = "false", isActive = "true
 
         console.log(" req.user.roleId", req.user.roleId);
 
-        if( req.user.roleId !== 1){
+        if (req.user.roleId !== 1) {
             whereCondition.createdBy = req.user._id
             console.log("thisssss");
         }
@@ -480,26 +505,26 @@ exports.getAllActiveUndeletedClients = async (req, res) => {
 
         const clients = await userModel.find(whereCondition);
 
-        if(clients){
+        if (clients) {
 
             return res.status(statusCode.OK).send({
                 message: "All Clinets Found Successfully...",
-                data : clients
+                data: clients
             });
 
-        }else{
+        } else {
 
             return res.status(statusCode.Conflict).send({
                 message: " Clinets Data Not Found...",
-                data : null
+                data: null
             });
         }
 
 
 
 
-        
-    }  catch (error) {
+
+    } catch (error) {
         res.status(statusCode.InternalServerError).send({
             message: error.message || errorMessage.lblInternalServerError,
         });
@@ -1514,7 +1539,7 @@ exports.createProduct = async (req, res) => {
 
         const { id } = req.body
 
-        console.log("req.body",req.body);
+        console.log("req.body", req.body);
 
         if (id) {
 
@@ -2210,15 +2235,15 @@ exports.createAgent = async (req, res) => {
 
             let profileObject = {
                 firstName: firstName,
-                middleName : middleName,
+                middleName: middleName,
                 lastName: lastName,
                 city: city,
                 state: state,
                 phone: phone,
-                officePhone : officePhone,
+                officePhone: officePhone,
                 branchId: branchId,
                 password: hash,
-                profileCreated : true,
+                profileCreated: true,
             }
 
             if (req.file && req.file.filename) {
@@ -2226,11 +2251,11 @@ exports.createAgent = async (req, res) => {
                 profileObject = {
                     ...profileObject,
                     profileImage: req.file.filename
-    
+
                 }
             }
 
-            const updateAgent = await userModel.updateOne({ email: email }, {...profileObject});
+            const updateAgent = await userModel.updateOne({ email: email }, { ...profileObject });
 
             if (updateAgent) {
 
@@ -2247,6 +2272,9 @@ exports.createAgent = async (req, res) => {
 
             const hash = bcrypt.hashSync(password, 10);
 
+            const roleObjId = await Roles.findOne({ id: roleId });
+
+
             let profileObject = {
                 email: email,
                 firstName: firstName,
@@ -2255,7 +2283,7 @@ exports.createAgent = async (req, res) => {
                 city: city,
                 state: state,
                 phone: phone,
-                officePhone : officePhone,
+                officePhone: officePhone,
                 branchId: branchId,
                 roleId: roleId,
                 isVerified: true,
@@ -2263,7 +2291,7 @@ exports.createAgent = async (req, res) => {
                 password: hash,
                 Role: roleObjId?._id,
                 createdBy: req.user?._id,
-                profileCreated : true
+                profileCreated: true
             }
 
 
@@ -2275,12 +2303,11 @@ exports.createAgent = async (req, res) => {
                 }
             }
 
-            const roleObjId = await Roles.findOne({ id: roleId });
-            
-            const createAgent = await userModel.create({...profileObject });
+
+            const createAgent = await userModel.create({ ...profileObject });
 
             const createClientListUnderAgnet = await ClinetsUnderAgent.create({
-                userId : createAgent._id
+                userId: createAgent._id
             })
 
             if (createAgent) {
@@ -2841,6 +2868,68 @@ exports.deleteAgent = async (req, res) => {
         return res.status(statusCode.OK).json({
             message: "Agent permanently deleted successfully.",
         });
+    } catch (error) {
+        console.error("Error:", error);
+        return res.status(statusCode.InternalServerError).json({
+            message: errorMessage.lblInternalServerError,
+        });
+    }
+};
+
+
+// get agent of particular branch
+exports.getAgentOfParticularBranch = async (req, res) => {
+    try {
+        const { branchId } = req.params;
+
+        const admin = req.user;
+
+        if (admin.roleId !== 1) {
+            return res.status(statusCode.Unauthorized).send({
+                message: "Unauthorize to access this."
+            });
+        }
+
+
+        if (branchId) {
+            let whereCondition = {
+                isActive: true,
+                deletedAt: null,
+                roleId: 2,
+                branchId: branchId
+            };
+
+            const agents = await userModel.find(whereCondition);
+
+            console.log("agents", agents);
+
+            if (agents.length > 0) {
+                return res.status(statusCode.OK).json({
+                    message: "Agents Found successfully.",
+                    count: agents.length,
+                    agents: agents
+
+                });
+
+            } else {
+
+                return res.status(statusCode.NotFound).json({
+                    message: "Agents Not Found successfully.",
+                    agents: null
+
+                });
+
+            }
+
+
+        } else {
+
+            return res.status(statusCode.BadRequest).json({
+                message: "BranchId Not Provided",
+            });
+
+        }
+
     } catch (error) {
         console.error("Error:", error);
         return res.status(statusCode.InternalServerError).json({
@@ -3504,16 +3593,16 @@ exports.adminSubmitLoanDetailsForm = async (req, res) => {
                 const countLoanApplication = await ApplicantForm.countDocuments({});
 
                 const count = countLoanApplication + 1;
-                const stringCode = "SMS/"+"542/"+count+"-"+ new Date().getFullYear()+"/"+"245"
+                const stringCode = "SMS/" + "542/" + count + "-" + new Date().getFullYear() + "/" + "245"
 
-                const formSubmit = await ApplicantForm.create({ ...rest, loanId : stringCode  });
+                const formSubmit = await ApplicantForm.create({ ...rest, loanId: stringCode });
 
                 const trackingDetails = {
                     productId: req.body.productId,
                     userId: req.body.userId,
                     loanFormId: formSubmit._id,
                     stepAt: "1",
-                    loanFormCompleted : true
+                    loanFormCompleted: true
                 }
 
                 const tracking = await LoanFormTracking.create(trackingDetails);
@@ -3522,7 +3611,7 @@ exports.adminSubmitLoanDetailsForm = async (req, res) => {
                 return res.status(statusCode.OK).send({
                     message: "Sucessfully submitted...",
                     loanForm: formSubmit,
-                    trackingdata : tracking
+                    trackingdata: tracking
                 })
 
             } else {
@@ -3572,17 +3661,17 @@ exports.adminEditLoanDetailsForm = async (req, res) => {
 
                     const update = await ApplicantForm.updateOne({ _id: id }, { ...dataObject });
 
-                    console.log("update",update);
+                    console.log("update", update);
 
                     if (update.acknowledged) {
                         const formSubmit = await ApplicantForm.findById(id);
-                       const tracking = await LoanFormTracking.findOne({loanFormId : id });
+                        const tracking = await LoanFormTracking.findOne({ loanFormId: id });
 
 
                         return res.status(statusCode.OK).send({
                             message: "Form Updated Successsfully...",
-                            data : formSubmit,
-                            trackingdata : tracking
+                            data: formSubmit,
+                            trackingdata: tracking
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -3684,7 +3773,7 @@ exports.adminSubmitApplicantInfo = async (req, res) => {
 
     try {
 
-        const { loanFormId, firstName, lastName, dateOfBirth, maritalStatus, email, optionalEmail, phone, emergencyPhone, city, state, ZipCode, propertyOwnerShip, jobTitle, placeOfWork, workAddress, yearOfExperience, monthlyNetIncome, adharNumber, panNumber, voterNumber, drivingLicenseNumber } = req.body
+        const { loanFormId, firstName, lastName, dateOfBirth, maritalStatus, email, optionalEmail, phone, emergencyPhone, city, state, ZipCode, propertyOwnerShip, jobTitle, placeOfWork, workAddress, yearOfExperience, monthlyNetIncome } = req.body
         const user = req.user;
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -3699,15 +3788,20 @@ exports.adminSubmitApplicantInfo = async (req, res) => {
 
                     const trackingDetails = {
                         stepAt: "2",
-                        applicantInfoCompleted : true
+                        applicantInfoCompleted: true
 
                     }
 
                     const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
 
                     if (appliacntInfoSubmit) {
+                        const fromExist = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+
                         return res.status(statusCode.OK).send({
                             message: "Applicant Info Sucessfully submitted...",
+                            applicantData: appliacntInfoSubmit,
+                            trackingdata: fromExist,
+
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -3768,9 +3862,14 @@ exports.adminEditApplicantInfo = async (req, res) => {
 
                     const update = await ApplicantInfo.updateOne({ _id: id }, { ...dataObject });
 
+
                     if (update.acknowledged) {
+                        const appliacntInfoSubmit = await ApplicantInfo.findById(id);
+
                         return res.status(statusCode.OK).send({
                             message: "Applicant Details Updated Successsfully...",
+                            applicantData: appliacntInfoSubmit,
+
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -3823,7 +3922,8 @@ exports.adminGetSubmitedApplicantInfo = async (req, res) => {
         if (userExist) {
 
             if (user.roleId < 3) {
-                const formSubmit = await ApplicantInfo.findById(id).populate("userId");
+                const formSubmit = await ApplicantInfo.findOne({ loanFormId: id })
+                // .populate("userId");
 
                 if (formSubmit) {
                     return res.status(statusCode.OK).send({
@@ -3897,15 +3997,19 @@ exports.adminSubmitApplicantBankInfo = async (req, res) => {
 
                     const trackingDetails = {
                         stepAt: "3",
-                        bankInfoCompleted : true
+                        bankInfoCompleted: true
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
 
 
                     if (appliacntBankInfoSubmit) {
+                        const fromExist = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+
                         return res.status(statusCode.OK).send({
                             message: "Bank Info Sucessfully submitted...",
+                            appliacntBankInfo: appliacntBankInfoSubmit,
+                            trackingdata: fromExist,
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -3966,8 +4070,13 @@ exports.adminEditApplicantBankInfo = async (req, res) => {
                     const update = await BankInfo.updateOne({ _id: id }, { ...dataObject });
 
                     if (update.acknowledged) {
+
+                        const bankInfo = await BankInfo.findById(id);
+
                         return res.status(statusCode.OK).send({
                             message: "Applicant Bank Details Updated Successsfully...",
+                            appliacntBankInfo: bankInfo,
+
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -4017,7 +4126,8 @@ exports.adminGetSubmitedApplicantBankInfo = async (req, res) => {
         if (userExist) {
 
             if (user.roleId < 3) {
-                const formSubmit = await BankInfo.findById(id).populate("userId").populate("loanFormId");
+                const formSubmit = await BankInfo.findOne({ loanFormId: id })
+                // .populate("userId").populate("loanFormId");
 
                 if (formSubmit) {
                     return res.status(statusCode.OK).send({
@@ -4048,6 +4158,63 @@ exports.adminGetSubmitedApplicantBankInfo = async (req, res) => {
         return res.status(statusCode.InternalServerError).send({
             message: errorMessage.lblInternalServerError
         })
+
+    }
+
+}
+
+
+// upload passbook
+
+exports.uploadPassbook = async (req, res) => {
+
+    try {
+
+        const { id } = req.body;
+
+        let profileObject = {}
+
+
+
+        if (req.file && req.file.filename) {
+            // profileImageName = req.file.filename
+            profileObject = {
+                ...profileObject,
+                passBookFrontImage: req.file.filename
+
+            }
+        }
+
+
+        const bankInfo = await BankInfo.findById(id);
+
+        if (bankInfo) {
+
+            const update = await BankInfo.updateOne({ _id: id }, { ...profileObject });
+
+            if (update.acknowledged) {
+
+                const bankInfo = await BankInfo.findById(id);
+
+                return res.status(statusCode.OK).send({
+                    message: "Applicant Passbook Updated Successsfully...",
+                    appliacntBankInfo: bankInfo,
+
+                })
+            } else {
+                return res.status(statusCode.ExpectationFailed).send({
+                    message: "Error occured in editting Applicant Bank Details .."
+                })
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "Applicant Bank Details Form Not Found"
+            })
+        }
+
+
+    } catch (error) {
 
     }
 
@@ -4087,7 +4254,7 @@ exports.adminSubmitApplicantGuarantorInfo = async (req, res) => {
 
                     const trackingDetails = {
                         stepAt: "4",
-                        guarantorInfoCompleted : true
+                        guarantorInfoCompleted: true
 
                     }
 
@@ -4095,8 +4262,12 @@ exports.adminSubmitApplicantGuarantorInfo = async (req, res) => {
 
 
                     if (appliacntGuarantorInfoSubmit) {
+                        const fromExist = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+
                         return res.status(statusCode.OK).send({
                             message: "Guarantor Info Sucessfully submitted...",
+                            applicantGuarantorInfo: appliacntGuarantorInfoSubmit,
+                            trackingdata: fromExist,
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -4162,8 +4333,11 @@ exports.adminEditApplicantGuarantorInfo = async (req, res) => {
                     const update = await GuarantorInfo.updateOne({ _id: id }, { ...dataObject });
 
                     if (update.acknowledged) {
+                        const guarantorInfo = await GuarantorInfo.findById(id);
+
                         return res.status(statusCode.OK).send({
                             message: "Applicant Guarantor Details Updated Successsfully...",
+                            applicantGuarantorInfo: guarantorInfo,
                         })
                     } else {
                         return res.status(statusCode.ExpectationFailed).send({
@@ -4216,7 +4390,8 @@ exports.adminGetSubmitedApplicantGuarantorInfo = async (req, res) => {
         if (userExist) {
 
             if (user.roleId < 3) {
-                const guarantor = await GuarantorInfo.findById(id).populate("userId").populate("loanFormId");
+                const guarantor = await GuarantorInfo.findOne({ loanFormId: id })
+                // .populate("userId").populate("loanFormId");
 
                 if (guarantor) {
                     return res.status(statusCode.OK).send({
@@ -4350,11 +4525,12 @@ exports.adminUpdateAdharBackAndFrontOfGuarantor = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } else {
-            return res.status(statusCode.BadRequest).send({
-                message: "image Not Provided"
-            })
         }
+        // else {
+        //     return res.status(statusCode.BadRequest).send({
+        //         message: "image Not Provided"
+        //     })
+        // }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -4369,13 +4545,17 @@ exports.adminUpdateAdharBackAndFrontOfGuarantor = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "5"
+                        stepAt: "4"
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+
+                    const guarantorInfo = await GuarantorInfo.findOne({ loanFormId: loanFormId })
 
                     return res.status(statusCode.OK).send({
-                        message: "Guarantor Adhar Card uploaded successfully..."
+                        message: "Guarantor Adhar Card uploaded successfully...",
+                        applicantGuarantorInfo: guarantorInfo,
+
                     })
 
                 } else {
@@ -4719,11 +4899,13 @@ exports.adminUpdateAdharBackAndFront = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } else {
-            return res.status(statusCode.BadRequest).send({
-                message: "image Not Provided"
-            })
         }
+
+        // else {
+        //     return res.status(statusCode.BadRequest).send({
+        //         message: "image Not Provided"
+        //     })
+        // }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -4738,13 +4920,16 @@ exports.adminUpdateAdharBackAndFront = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "6"
+                        stepAt: "2",
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+
+                    const applicantInfo = await ApplicantInfo.findOne({ loanFormId: loanFormId })
 
                     return res.status(statusCode.OK).send({
-                        message: "Adhar Card uploaded successfully..."
+                        message: "Adhar Card uploaded successfully...",
+                        applicantInfo: applicantInfo
                     })
 
                 } else {
@@ -4793,11 +4978,12 @@ exports.adminUpdatePanBackAndFront = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } else {
-            return res.status(statusCode.BadRequest).send({
-                message: "image Not Provided"
-            })
         }
+        //  else {
+        //     return res.status(statusCode.BadRequest).send({
+        //         message: "image Not Provided"
+        //     })
+        // }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -4812,13 +4998,16 @@ exports.adminUpdatePanBackAndFront = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "6"
+                        stepAt: "2",
                     }
 
                     const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const applicantInfo = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
 
                     return res.status(statusCode.OK).send({
-                        message: "Pan Card uploaded successfully..."
+                        message: "Pan Card uploaded successfully...",
+                        applicantInfo: applicantInfo
                     })
 
                 } else {
@@ -4866,11 +5055,13 @@ exports.adminUpdateVoterBackAndFront = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } else {
-            return res.status(statusCode.BadRequest).send({
-                message: "image Not Provided"
-            })
         }
+
+        // else {
+        //     return res.status(statusCode.BadRequest).send({
+        //         message: "image Not Provided"
+        //     })
+        // }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -4886,13 +5077,16 @@ exports.adminUpdateVoterBackAndFront = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "6"
+                        stepAt: "2",
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+                    const applicantInfo = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
 
                     return res.status(statusCode.OK).send({
-                        message: "Voter Card uploaded successfully..."
+                        message: "Voter Card uploaded successfully...",
+                        applicantInfo: applicantInfo
                     })
 
                 } else {
@@ -4941,11 +5135,12 @@ exports.adminUpdateLicenseBackAndFront = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } else {
-            return res.status(statusCode.BadRequest).send({
-                message: "image Not Provided"
-            })
         }
+        // else {
+        //     return res.status(statusCode.BadRequest).send({
+        //         message: "image Not Provided"
+        //     })
+        // }
 
         const userExist = await userModel.findOne({ email: user.email });
         if (userExist) {
@@ -4960,13 +5155,16 @@ exports.adminUpdateLicenseBackAndFront = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "6"
+                        stepAt: "2",
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+                    const applicantInfo = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
 
                     return res.status(statusCode.OK).send({
-                        message: "Driving License uploaded successfully..."
+                        message: "Driving License uploaded successfully...",
+                        applicantInfo: applicantInfo
                     })
 
                 } else {
@@ -5078,7 +5276,7 @@ exports.adminUpdatePhotoAndSignature = async (req, res) => {
                 profileImageName.push(element.filename)
             }
 
-        } 
+        }
         // else {
         //     return res.status(statusCode.BadRequest).send({
         //         message: "image Not Provided"
@@ -5097,14 +5295,18 @@ exports.adminUpdatePhotoAndSignature = async (req, res) => {
                 if (update.acknowledged) {
 
                     const trackingDetails = {
-                        stepAt: "6",
-                        applicantPhotoAndSignatureUploadCompleted : true
+                        stepAt: "5",
+                        applicantPhotoAndSignatureUploadCompleted: true
                     }
 
-                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails)
+                    const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+                    const fromTrack = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+                    const appliacntInfoSubmit = await ApplicantInfo.findOne({ loanFormId: loanFormId })
 
                     return res.status(statusCode.OK).send({
-                        message: "Photo and Signature uploaded successfully..."
+                        message: "Photo and Signature uploaded successfully...",
+                        applicantData: appliacntInfoSubmit,
+                        trackingdata: fromTrack,
                     })
 
                 } else {
@@ -5208,9 +5410,10 @@ exports.adminfinalSubmitOfLoanForm = async (req, res) => {
             if (fromExist) {
 
                 const trackingDetails = {
-                    stepAt: "7",
+                    stepAt: "6",
                     isStepsCompleted: true,
                     fromSubmittedOn: new Date(),
+                    submittedByOwn: false,
                     fromSubmittedBy: user._id
                 }
 
@@ -5230,18 +5433,68 @@ exports.adminfinalSubmitOfLoanForm = async (req, res) => {
                         name: applicant.firstName + " " + applicant.lastName,
                         loanName: fromExist?.loanName.toUpperCase(),
                         applyingDate: formatCustomDate(new Date()),
-                        loanId : fromExist?.loanId
+                        loanId: fromExist?.loanId
                     },
                 };
                 console.log("mailOptions", mailOptions);
 
 
-                await mailSender(mailOptions)
+                await mailSender(mailOptions);
+
+
+                // notification section
+
+                const applicant2 = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
+                const firstName = applicant2.firstName ? applicant2.firstName : "";
+                const lastName = applicant2.lastName ? applicant2.lastName : "";
+                const fullName = firstName + " " + lastName;
+
+                const idObject = {
+                    userId: fromExist.userId,
+                    loanFormId: loanFormId
+                };
+
+
+                function formatCustomDate(date) {
+                    const options = {
+                        weekday: 'long', // Full weekday name (e.g., "Monday")
+                        day: 'numeric',  // Numeric day of the month (e.g., 03)
+                        month: 'short',  // Short month name (e.g., "Feb")
+                        year: 'numeric', // Full year (e.g., 2024)
+                        hour: 'numeric', // Hour in 12-hour clock format (e.g., 11)
+                        minute: 'numeric', // Minute (e.g., 13)
+                        hour12: true,    // Use 12-hour clock format (e.g., "am" or "pm")
+                    };
+                    return date.toLocaleString('en-US', options);
+                }
+
+                const bodyString = `An application for ${fromExist.loanName} has been registered by ${fullName !== "" ? fullName.toUpperCase() : ""} on ${formatCustomDate(new Date())} from ${applicant2.city ? applicant2?.city : ""} `;
+
+                const dataObject = {
+                    header: "New Loan Application Registered.",
+                    subHeader: `Application Submitted by ${fullName !== "" ? fullName.toUpperCase() : ""}`,
+                    body: bodyString,
+                    importantId: JSON.stringify(idObject),
+                }
+
+
+                const admins = await userModel.find({ roleId: 1 }, '_id');
+
+                for (let index = 0; index < admins.length; index++) {
+                    const id = admins[index]._id;
+                    const createNotification = await SuperAdminNotification.create({
+                        ...dataObject,
+                        userId: id,
+                        notificationType: 1
+                    });
+                }
+
 
                 if (update.acknowledged) {
 
                     return res.status(statusCode.OK).send({
-                        message: "Your Loan Application Has Been Successfully Submitted...."
+                        message: "Loan Application Has Been Successfully Submitted...."
                     })
 
                 } else {
@@ -5282,6 +5535,7 @@ exports.adminfinalSubmitOfLoanForm = async (req, res) => {
 // #------- Get All Notification list with data and count controller starts here
 
 exports.getAllNotificationList = async (req, res, next, listAll = "false") => {
+
     try {
         const user = req.user;
 
@@ -5295,7 +5549,6 @@ exports.getAllNotificationList = async (req, res, next, listAll = "false") => {
             deletedAt: null,
             notificationType: notificationType,
             userId: user._id
-
         };
 
         if (searchText) {
@@ -5325,6 +5578,57 @@ exports.getAllNotificationList = async (req, res, next, listAll = "false") => {
 // #------- Get All Notification list with data and count controller ends here
 
 
+
+// ### ------- Get All loan application -------
+
+exports.getAllLoanApplication = async (req, res, next, listAll = "false") => {
+
+    try {
+        const user = req.user;
+        // const searchText = req.query.keyword ? req.query.keyword.trim() : '';
+        const fromSubmittedBy = req.query.fromSubmittedBy || null;
+
+        const branchId = req.query.branchId || null;
+        const productId = req.query.productId || null;
+        const approval = req.query.approval || true;
+        const isAgentAssigned = req.query.isAgentAssigned || true;
+        const isBranchAssigned = req.query.isBranchAssigned || true;
+        const isStepsCompleted = req.query.isStepsCompleted || true;
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.perPage) || 10;
+        const skip = (page - 1) * limit;
+
+        const whereCondition = {
+
+            deletedAt: null,
+            branchId: branchId,
+            productId: productId,
+            approval: approval,
+            isAgentAssigned: isAgentAssigned,
+            isBranchAssigned: isBranchAssigned,
+            isStepsCompleted: isStepsCompleted,
+            fromSubmittedBy: fromSubmittedBy,
+
+        };
+
+        const [applications, count] = await Promise.all([
+            LoanFormTracking.find(whereCondition).skip(skip).limit(limit).sort({ _id: 'desc' }),
+            LoanFormTracking.countDocuments(whereCondition),
+        ]);
+
+        return res.json({
+            message: 'List of all applications!',
+            count: count,
+            listOfApplications: applications,
+        });
+
+    } catch (error) {
+        res.status(statusCode.InternalServerError).send({
+            message: error.message || errorMessage.lblInternalServerError,
+        });
+    }
+};
 
 
 // ###----- Admin Assign Applicant Loan Application to Agent Controller Starts here----
@@ -5374,25 +5678,26 @@ exports.adminAssignApplicantLoanToAgent = async (req, res) => {
                         }
                     );
 
-                    const isClinetsUnderAgentExist = await ClinetsUnderAgent.findOneAnd({userId : agentId });
+                    const isClinetsUnderAgentExist = await ClinetsUnderAgent.findOne({ userId: agentId });
 
-                    const clinetsIdList =  isClinetsUnderAgentExist?.clinetsIdList;
+                    const clinetsIdList = isClinetsUnderAgentExist?.clinetsIdList;
 
                     let pareseList = [];
 
-                    if(clinetsIdList){
 
-                         pareseList = JSON.parse(clinetsIdList);
-                        pareseList.push({clientId : fromExist?.userId})
-
+                    if (clinetsIdList == null || clinetsIdList == undefined) {
+                        pareseList.push({ clientId: fromExist?.userId, loanFormId: loanFormId })
+                    } else {
+                        pareseList = JSON.parse(clinetsIdList);
+                        pareseList.push({ clientId: fromExist?.userId, loanFormId: loanFormId })
                     }
 
                     const stringClientsList = JSON.stringify(pareseList);
 
 
-                    const updateClientSUnderAgent = await ClinetsUnderAgent.findOneAndUpdate({userId : agentId },{
-                        clinetsIdList : stringClientsList
-                    } )
+                    const updateClientSUnderAgent = await ClinetsUnderAgent.findOneAndUpdate({ userId: agentId }, {
+                        clinetsIdList: stringClientsList
+                    })
 
 
                     if (loanForTracking) {
@@ -5460,74 +5765,95 @@ exports.adminAssignApplicantLoanToAgent = async (req, res) => {
 
                     }
 
-
-
                 } else {
                     return res.status(statusCode.OK).send({
                         message: "Not Authorized To Assign...",
                     })
                 }
 
-                // const trackingDetails = {
-                //     stepAt: "7",
-                //     isStepsCompleted: true,
-                //     fromSubmittedOn: new Date(),
-                //     fromSubmittedBy : user._id
-                // }
+            } else {
 
-                // const update = await LoanFormTracking.updateOne({ loanFormId: loanFormId }, trackingDetails);
+                return res.status(statusCode.NotFound).send({
+                    message: "Loan Form Not Found...",
+                })
 
-                // if (update.acknowledged) {
-                //     const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId })
-                //     const firstName = applicant.firstName ? applicant.firstName : "";
-                //     const lastName = applicant.lastName ? applicant.lastName : "";
-                //     const fullName = firstName + " " + lastName;
+            }
 
-                //     const idObject = {
-                //         userId: fromExist.userId,
-                //         loanFormId: loanFormId
-                //     };
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
 
-                //     function formatCustomDate(date) {
-                //         const options = {
-                //             weekday: 'long', // Full weekday name (e.g., "Monday")
-                //             day: 'numeric',  // Numeric day of the month (e.g., 03)
-                //             month: 'short',  // Short month name (e.g., "Feb")
-                //             year: 'numeric', // Full year (e.g., 2024)
-                //             hour: 'numeric', // Hour in 12-hour clock format (e.g., 11)
-                //             minute: 'numeric', // Minute (e.g., 13)
-                //             hour12: true,    // Use 12-hour clock format (e.g., "am" or "pm")
-                //         };
-                //         return date.toLocaleString('en-US', options);
-                //     }
+    } catch (error) {
 
-                //     const bodyString = `An application for ${fromExist.loanName} has been registered by ${fullName !== "" ? fullName.toUpperCase() : ""} on ${formatCustomDate(new Date())} from ${applicant.city ? applicant?.applicant : ""} `;
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
 
-                //     const dataObject = {
-                //         header: "New Loan Application Registered.",
-                //         subHeader: `Application Submitted by ${fullName !== "" ? fullName.toUpperCase() : ""}`,
-                //         body: bodyString,
-                //         importantId: JSON.stringify(idObject),
-                //         submittedByOwn : false
-                //     }
+    }
 
-                //     const users = await userModel.find({ roleId: 1, _id: { $ne: user._id } }, '_id');
+}
 
 
-                //     for (let index = 0; index < users.length; index++) {
-                //         const id = users[index]._id;
-                //         const createNotification = await SuperAdminNotification.create({
-                //             ...dataObject,
-                //             userId: id,
-                //             notificationType: 1
-                //         });
-                //     }
 
-                //     return res.status(statusCode.OK).send({
-                //         message: "Your Loan Application Has Been Successfully Submitted...."
-                //     })
+// ###----- Admin discard Applicant Loan Application Starts here----
+exports.adminDiscardApplicantLoan = async (req, res) => {
 
-                // }
+    try {
+
+        const { loanFormId } = req.params;
+
+        const user = req.user;
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const fromExist = await ApplicantForm.findById(loanFormId);
+
+            if (fromExist) {
+
+                if (user.roleId < 3) {
+
+                    const loanForTracking = await LoanFormTracking.findOneAndUpdate({ loanFormId: loanFormId },
+                        {
+                            applicationDiscard: true,
+                            applicationDiscardBy: user._id
+                        }
+                    );
+
+
+                    if (loanForTracking) {
+
+                        const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId });
+                        const tracking = await LoanFormTracking.findOne({ loanFormId: loanFormId })
+
+                        const mailOptions = {
+                            from: "aatif13698@gmail.com",
+                            to: applicant.email,
+                            subject: "Loan Applicantion Rejected On First Phase.",
+                            template: "applicationDiscarded",
+                            context: {
+                                email: applicant.email,
+                                name: applicant.firstName + " " + applicant.lastName,
+                                loanName: fromExist?.loanName.toUpperCase(),
+                                applyingDate: formatCustomDate(tracking?.fromSubmittedOn),
+                            },
+                        };
+
+                        await mailSender(mailOptions);
+
+                        return res.status(statusCode.OK).send({
+                            message: "Application Has Been Discarded Successfully...",
+                        })
+
+                    }
+
+                } else {
+                    return res.status(statusCode.OK).send({
+                        message: "Not Authorized To Discarded...",
+                    })
+                }
 
             } else {
 
@@ -5557,6 +5883,7 @@ exports.adminAssignApplicantLoanToAgent = async (req, res) => {
 
 
 
+
 // ## create Noc pdf controller
 exports.createNocPdf = async (req, res) => {
     try {
@@ -5568,39 +5895,39 @@ exports.createNocPdf = async (req, res) => {
             let wealthData = {
 
             };
-    
-    
+
+
             const wealthBody = await ejs.renderFile(
                 path.join(__dirname, '../templates/noc.ejs'),
                 wealthData
             );
-    
-    
+
+
             if (!fs.existsSync('./public/nocPdf')) {
                 fs.mkdirSync('./public/nocPdf');
             }
-    
+
             const pdfFolderPath = './public/nocPdf';
-    
+
             const pdfFileName = `${1}_Noc.pdf`;
-    
+
             const pdfFilePath = path.join(pdfFolderPath, pdfFileName);
-    
+
             if (fs.existsSync(pdfFilePath)) {
                 fs.unlinkSync(pdfFilePath);
             }
-    
-    
+
+
             const browser = await puppeteer.launch();
             const page = await browser.newPage();
-    
+
             await page.setContent(wealthBody);
             await page.pdf({
                 path: pdfFilePath,
                 format: 'A4',
                 printBackground: true
             });
-    
+
             await browser.close();
 
             const pdfStream = fs.createReadStream(pdfFilePath);
@@ -5619,7 +5946,7 @@ exports.createNocPdf = async (req, res) => {
 
 
 
-       
+
     } catch (error) {
         res.status(statusCode.InternalServerError).send({
             message: error.message || errorMessage.lblInternalServerError,
@@ -5628,10 +5955,549 @@ exports.createNocPdf = async (req, res) => {
 };
 
 
+// ### ------ Agent Verify the Applicant Loan Application
+exports.agentVerifyApplicantLonApplication = async (req, res) => {
+
+    try {
+
+        const { loanFormId } = req.params;
+
+        const user = req.user;
+        const userExist = await userModel.findOne({ email: user.email });
+
+        if (userExist) {
+
+            const fromExist = await ApplicantForm.findById(loanFormId);
+
+            if (fromExist) {
+
+                if (user.roleId < 3) {
+
+
+                    const loanForTracking = await LoanFormTracking.findOneAndUpdate({ loanFormId: loanFormId },
+                        {
+                            applicationVerified: true,
+                            applicationVerifiedBy: user._id,
+
+                            applicationRjected: false,
+                            applicationRejectedBy: null
+
+                        }
+                    );
+
+
+                    if (loanForTracking) {
+
+                        const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
+                        const firstName = applicant.firstName ? applicant.firstName : "";
+                        const lastName = applicant.lastName ? applicant.lastName : "";
+                        const fullName = firstName + " " + lastName;
+
+                        const idObject = {
+                            userId: fromExist.userId,
+                            loanFormId: loanFormId
+                        };
+
+
+
+                        function formatCustomDate(date) {
+                            const options = {
+                                weekday: 'long', // Full weekday name (e.g., "Monday")
+                                day: 'numeric',  // Numeric day of the month (e.g., 03)
+                                month: 'short',  // Short month name (e.g., "Feb")
+                                year: 'numeric', // Full year (e.g., 2024)
+                                hour: 'numeric', // Hour in 12-hour clock format (e.g., 11)
+                                minute: 'numeric', // Minute (e.g., 13)
+                                hour12: true,    // Use 12-hour clock format (e.g., "am" or "pm")
+                            };
+                            return date.toLocaleString('en-US', options);
+                        }
+
+                        const bodyString = `Loan Application of ${fullName} has been verified by ${user?.firstName} on ${formatCustomDate(new Date())}.`;
+
+                        const dataObject = {
+                            header: "Loan Application Verified.",
+                            subHeader: `Applicat Name : ${fullName !== "" ? fullName.toUpperCase() : ""}`,
+                            body: bodyString,
+                            importantId: JSON.stringify(idObject),
+                            notificationType: 2,
+                        }
+
+
+
+                        const admins = await userModel.find({ roleId: 1 }, '_id');
+
+                        for (let index = 0; index < admins.length; index++) {
+                            const id = admins[index]._id;
+                            const createNotification = await SuperAdminNotification.create({
+                                ...dataObject,
+                                userId: id,
+                                notificationType: 2
+                            });
+                        }
+
+
+                        const tracking = await LoanFormTracking.findOne({ loanFormId: loanFormId })
+
+                        const mailOptions = {
+                            from: "aatif13698@gmail.com",
+                            to: applicant.email,
+                            subject: "Loan Applicantion Verified Successfully...",
+                            template: "applicationVerified",
+                            context: {
+                                email: applicant.email,
+                                name: applicant.firstName + " " + applicant.lastName,
+                                loanName: fromExist?.loanName.toUpperCase(),
+                                applyingDate: formatCustomDate(tracking?.fromSubmittedOn),
+                            },
+                        };
+
+                        await mailSender(mailOptions);
+
+                        return res.status(statusCode.OK).send({
+                            message: "Loan Application Verified Successfully...",
+                        })
+
+                    }
+
+                } else {
+                    return res.status(statusCode.OK).send({
+                        message: "Not Authorized To Assign...",
+                    })
+                }
+
+            } else {
+
+                return res.status(statusCode.NotFound).send({
+                    message: "Loan Form Not Found...",
+                })
+
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+
+    } catch (error) {
+
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+
+    }
+
+}
+
+
+// ### ------ Agent Reject the Applicant Loan Application
+exports.agentRejectApplicantLonApplication = async (req, res) => {
+
+    try {
+
+        const { loanFormId } = req.params;
+
+        const user = req.user;
+        const userExist = await userModel.findOne({ email: user.email });
+
+        if (userExist) {
+
+            const fromExist = await ApplicantForm.findById(loanFormId);
+
+            if (fromExist) {
+
+                if (user.roleId < 3) {
+
+
+                    const loanForTracking = await LoanFormTracking.findOneAndUpdate({ loanFormId: loanFormId },
+                        {
+                            applicationVerified: false,
+                            applicationVerifiedBy: null,
+                            applicationRjected: true,
+                            applicationRejectedBy: user?._id
+
+                        }
+                    );
+
+
+                    if (loanForTracking) {
+
+                        const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId })
+
+                        const firstName = applicant.firstName ? applicant.firstName : "";
+                        const lastName = applicant.lastName ? applicant.lastName : "";
+                        const fullName = firstName + " " + lastName;
+
+                        const idObject = {
+                            userId: fromExist.userId,
+                            loanFormId: loanFormId
+                        };
+
+
+
+                        function formatCustomDate(date) {
+                            const options = {
+                                weekday: 'long', // Full weekday name (e.g., "Monday")
+                                day: 'numeric',  // Numeric day of the month (e.g., 03)
+                                month: 'short',  // Short month name (e.g., "Feb")
+                                year: 'numeric', // Full year (e.g., 2024)
+                                hour: 'numeric', // Hour in 12-hour clock format (e.g., 11)
+                                minute: 'numeric', // Minute (e.g., 13)
+                                hour12: true,    // Use 12-hour clock format (e.g., "am" or "pm")
+                            };
+                            return date.toLocaleString('en-US', options);
+                        }
+
+                        const bodyString = `Loan Application of ${fullName} has been rejected by ${user?.firstName} on ${formatCustomDate(new Date())}.`;
+
+                        const dataObject = {
+                            header: "Loan Application Rejected.",
+                            subHeader: `Applicat Name : ${fullName !== "" ? fullName.toUpperCase() : ""}`,
+                            body: bodyString,
+                            importantId: JSON.stringify(idObject),
+                            notificationType: 3,
+                        }
+
+                        const admins = await userModel.find({ roleId: 1 }, '_id');
+
+                        for (let index = 0; index < admins.length; index++) {
+                            const id = admins[index]._id;
+                            const createNotification = await SuperAdminNotification.create({
+                                ...dataObject,
+                                userId: id,
+                                notificationType: 3
+                            });
+                        }
+
+
+                        const tracking = await LoanFormTracking.findOne({ loanFormId: loanFormId })
+
+                        const mailOptions = {
+                            from: "aatif13698@gmail.com",
+                            to: applicant.email,
+                            subject: "Loan Applicantion Verified Successfully...",
+                            template: "applicationRejected",
+                            context: {
+                                email: applicant.email,
+                                name: applicant.firstName + " " + applicant.lastName,
+                                loanName: fromExist?.loanName.toUpperCase(),
+                                applyingDate: formatCustomDate(tracking?.fromSubmittedOn),
+                            },
+                        };
+
+                        await mailSender(mailOptions);
+
+                        return res.status(statusCode.OK).send({
+                            message: "Loan Application Verified Successfully...",
+                        })
+
+                    }
+
+                } else {
+                    return res.status(statusCode.OK).send({
+                        message: "Not Authorized To Assign...",
+                    })
+                }
+
+            } else {
+
+                return res.status(statusCode.NotFound).send({
+                    message: "Loan Form Not Found...",
+                })
+
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+
+    } catch (error) {
+
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+
+    }
+
+}
+
+
+
+// ### ------ Loan application approved by super admin
+exports.loanApplicantLoanApprovedBySuperAdmin = async (req, res) => {
+
+    try {
+
+        const { loanFormId } = req.params;
+
+        const user = req.user;
+        const userExist = await userModel.findOne({ email: user.email });
+        if (userExist) {
+
+            const fromExist = await ApplicantForm.findById(loanFormId);
+
+            if (fromExist) {
+
+                if (user.roleId == 1) {
+
+                    const loanForTrackingExists = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+
+                    // ** return when application has not been fully completed yet.
+                    if (!loanForTrackingExists?.isStepsCompleted) {
+
+                        return res.status(statusCode.Conflict).send({
+                            message: "Loan Applicantion has not been completed yet.."
+                        })
+
+                    }
+
+                    // ** return when not assigned any agent
+                    if (!loanForTrackingExists?.isAgentAssigned) {
+
+                        return res.status(statusCode.Conflict).send({
+                            message: "Loan Applicantion has not been assigned to any agent yet.."
+                        })
+
+                    }
+
+                    // ** return when application has been rejected by agent
+                    if (loanForTrackingExists?.applicationRjected) {
+
+                        return res.status(statusCode.Conflict).send({
+                            message: "Loan Applicantion has been rejected by agent.."
+                        })
+
+                    }
+
+                    // ** return when application has not been verified by agent yet
+                    if (loanForTrackingExists?.isAgentAssigned && !loanForTrackingExists?.applicationVerified) {
+
+                        return res.status(statusCode.Conflict).send({
+                            message: "Loan Applicantion has not been verified by any agent yet.."
+                        })
+
+                    }
+
+                    // create PDF of Loan Approval
+
+                    let wealthData = {
+
+                    };
+
+                    const wealthBody = await ejs.renderFile(
+                        path.join(__dirname, '../templates/loanFinalApproval.ejs'),
+                        wealthData
+                    );
+
+
+                    if (!fs.existsSync('./public/LoanApprovalPdf')) {
+                        fs.mkdirSync('./public/LoanApprovalPdf');
+                    }
+
+                    const pdfFolderPath = './public/LoanApprovalPdf';
+
+                    const pdfFileName = `${1}_loanApproval.pdf`;
+
+                    const pdfFilePath = path.join(pdfFolderPath, pdfFileName);
+
+                    if (fs.existsSync(pdfFilePath)) {
+                        fs.unlinkSync(pdfFilePath);
+                    }
+
+
+                    const browser = await puppeteer.launch();
+                    const page = await browser.newPage();
+
+                    await page.setContent(wealthBody);
+                    await page.pdf({
+                        path: pdfFilePath,
+                        format: 'A4',
+                        printBackground: true
+                    });
+
+                    await browser.close();
+
+                    const loanForTracking = await LoanFormTracking.findOneAndUpdate({ loanFormId: loanFormId },
+                        {
+                            approval: true,
+                            approvedBy: user._id,
+                            approvedOn: new Date(),
+                            loanApprovalPdf: pdfFileName,
+                        }
+                    );
+
+
+                    if (loanForTracking) {
+
+                        // *** We need to add the code to cerate the EMI Sheet for that application
+
+                        console.log("EmiSheet",fromExist);
+                        // {
+                        //     _id: new ObjectId('65d74860e51d439c3061c360'),
+                        //     userId: new ObjectId('65ca16f365ead02e157d765e'),
+                        //     loanName: 'Personal Loan',
+                        //     loanId: 'SMS/542/14-2024/245',
+                        //     rateOfInterest: 0.5,
+                        //     rateTyep: 'week',
+                        //     recoveryType: 'week',
+                        //     processingFeePercent: 20,
+                        //     processingFeeAmount: 44.2,
+                        //     amountDisburse: 221,
+                        //     amountSanctioned: 176.8,
+                        //     emiAmount: 23.205,
+                        //     NoOfEmi: 21,
+                        //     createdAt: 2024-02-22T12:50:46.487Z,
+                        //     deletedAt: null,
+                        //     __v: 0
+                        //   }
+
+                        const createSheet = await EmiSheet.create({
+
+                            userId : fromExist?.userId,
+                            loanFormId : fromExist?._id,
+                            loanId : fromExist?.loanId,
+                            rateOfInterest : fromExist?.rateOfInterest,
+                            recoveryType : fromExist?.recoveryType,
+                            processingFeePercent : fromExist?.processingFeePercent,
+                            processingFeeAmount : fromExist?.processingFeeAmount,
+                            disbursedAmount : fromExist?.amountDisburse,
+                            repaymentAmpount : fromExist?.processingFeePercent,
+                            processingFeePercent : fromExist?.processingFeePercent,
+
+                        })
+
+
+                        //  send the user congratulation mail
+
+                        const applicant = await ApplicantInfo.findOne({ loanFormId: loanFormId });
+                        const tracking = await LoanFormTracking.findOne({ loanFormId: loanFormId });
+
+
+                        const mailOptions = {
+                            from: "aatif13698@gmail.com",
+                            to: applicant.email,
+                            subject: "Loan Applicantion Rejected On First Phase.",
+                            template: "applicationApproved",
+                            context: {
+                                email: applicant.email,
+                                name: applicant.firstName + " " + applicant.lastName,
+                                loanName: fromExist?.loanName.toUpperCase(),
+                                applyingDate: formatCustomDate(tracking?.fromSubmittedOn),
+                                link : `${process.env.API_BASE_URL}/LoanApprovalPdf/${pdfFileName}` 
+                            },
+                        };
+
+                        await mailSender(mailOptions);
+
+                        return res.status(statusCode.OK).send({
+                            message: "Application Has Been Approved Successfully...",
+                            link :`${process.env.API_BASE_URL}/LoanApprovalPdf/${pdfFileName}` 
+                        })
+
+                    }
+
+                } else {
+                    return res.status(statusCode.OK).send({
+                        message: "Not Authorized To Give Approval...",
+                    })
+                }
+
+            } else {
+
+                return res.status(statusCode.NotFound).send({
+                    message: "Loan Form Not Found...",
+                })
+
+            }
+
+        } else {
+            return res.status(statusCode.NotFound).send({
+                message: "User Not Found"
+            })
+        }
+
+    } catch (error) {
+
+        console.log("error", error);
+        return res.status(statusCode.InternalServerError).send({
+            message: errorMessage.lblInternalServerError
+        })
+
+    }
+
+}
 
 
 
 
+
+// checkout payment
+
+exports.checkout = async (req, res) => {
+    const options = {
+      amount: Number(1000)*100,
+      currency: "INR",
+    };
+
+    console.log("process.env.RZORPAY_KEY_ID",process.env.RZORPAY_KEY_ID);
+    console.log(" process.env.RAZORPAY_SECRECT", process.env.RAZORPAY_SECRECT);
+
+    const instance = new Razorpay({
+        key_id: process.env.RZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_SECRECT,
+      });
+    // console.log("instance", instance);
+    const order = await instance.orders.create(options);
+    console.log("order",order);
+  
+    return  res.status(200).json({
+      success: true,
+      order,
+    });
+};
+
+
+
+exports. paymentVerification = async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
+  
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+  
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_SECRECT)
+      .update(body.toString())
+      .digest("hex");
+  
+    const isAuthentic = expectedSignature === razorpay_signature;
+  
+    if (isAuthentic) {
+      // Database comes here
+  
+     //   await Payment.create({
+     //     razorpay_order_id,
+     //     razorpay_payment_id,
+     //     razorpay_signature,
+     //   });
+  
+    return  res.send({
+        success: true,
+    });
+
+    } else {
+        return  res.status(400).json({
+        success: false,
+      });
+    }
+  };
+
+   // `http://localhost:3000/paymentsuccess?reference=${razorpay_payment_id}`
 
 
 

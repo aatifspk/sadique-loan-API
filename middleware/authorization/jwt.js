@@ -66,7 +66,7 @@ exports.checkAdminAuth = async (req, res, next) => {
             }
         } catch (error) {
             console.log(error);
-            res.send({ errorCode: 404, message: "unauthorized user" });
+           return   res.status(statusCode.Unauthorized).send({ message: error.message });
         }
     } else {
         res.send({ status: "no token" });

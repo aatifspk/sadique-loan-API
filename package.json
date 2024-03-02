@@ -20,6 +20,7 @@
     "nodemailer": "^6.9.7",
     "nodemailer-express-handlebars": "^6.1.0",
     "nodemon": "^3.0.2",
-    "puppeteer": "^22.0.0"
+    "puppeteer": "^22.0.0",
+    "razorpay": "^2.9.2"
   }
 }

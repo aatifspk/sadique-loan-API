@@ -16,14 +16,37 @@ const loanFormTrackingScrema = new mongoose.Schema(
         
         status : {type : Boolean, default : true},
 
-        documentVerfied : { type : Boolean, default : false},
-        documentVerfiedBy : {type:  String, default : null},
-
-        approval : { type : Boolean, default : false},
-        approvedBy : {type: String, default : null},
 
         pending : {type : Boolean, default : true},
+
+        // final loan Apploval by super admin
+        approval : { type : Boolean, default : false},
+        approvedBy : {type: String, default : null},
+        approvedOn : { type: Date, default : null},
+        loanApprovalPdf : {type: String, default : null},
+
+
+        // loan discarded at the time of assigning agent by super admin 
+        applicationDiscard : {type : Boolean, default : false},
+        applicationDiscardBy : {type : String, default : null},
+
+
+        // loan verified by agent
+        applicationVerified : {type : Boolean, default : false},
+        applicationVerifiedBy : {type : String, default : null},
+
+        // loan rejected by agent
+        applicationRjected : {type : Boolean, default : false},
+        applicationRejectedBy : {type : String, default : null},
+
+
+
+        // agent and branch assign by super admin
+        agentAndBranchAssignedBy :{type : String, default : null},
+
+
         isAgentAssigned : {type : Boolean, default : false},
+
         // agentId : {type: String, default : null},
 
         isBranchAssigned : {type : Boolean, default : false},
@@ -44,10 +67,8 @@ const loanFormTrackingScrema = new mongoose.Schema(
 
         submittedByOwn : {type : Boolean, default : true},
         fromSubmittedOn : { type: Date, default : null},
-
         fromSubmittedBy : {type : String, default : null},
 
-        agentAndBranchAssignedBy :{type : String, default : null},
 
         createdAt: {
             type: Date,

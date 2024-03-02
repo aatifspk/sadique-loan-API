@@ -13,14 +13,18 @@ const applicantInformationSchema = new mongoose.Schema({
 
     firstName : {type :String , required : true},
     lastName : {type :String},
+    fatherName : {type :String},
+    motherName : {type :String},
     dateOfBirth: { type: Date, default: null },
     maritalStatus : {type :String,default : null},  // option "unmarried", "married", "widow", "divorced", "other"
+    gender :  {type :String,default : null}, 
     email : {type :String , required : true},
     optionalEmail : {type :String , default : null},
     phone : {type :String , default : null},
     emergencyPhone : {type :String,default : null},
     city :  {type :String , default : null},    
     state :  {type :String , default : null},
+    address : {type :String , default : null},
     country :  {type :String , default : "India"},
     ZipCode :  {type :String , default : null},
     propertyOwnerShip :  {type :String , default : null},  // option "owned" or "rent"
@@ -30,9 +34,8 @@ const applicantInformationSchema = new mongoose.Schema({
 
     jobTitle :  {type :String , default : null},
     placeOfWork :  {type :String , default : null},
-    workAddress :  {type :String , default : null},
     yearOfExperience :  {type :Number , default : null},
-    monthlyNetIncome :  {type :Number , required : true},
+    monthlyNetIncome :  {type :Number , default : null},
 
 
     // indentity details

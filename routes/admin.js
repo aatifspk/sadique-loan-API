@@ -6,7 +6,7 @@ const multer = require('multer');
 const statusCode = require('../utils/http-status-code');
 const auth = require('../middleware/authorization/jwt');
 const {
-    uploadProfile, uploadCombined, uploadCombinedAdhar, uploadCombinedPan, uploadCombinedVoter, uploadCombinedLicense
+    uploadProfile, uploadCombined, uploadCombinedAdhar, uploadCombinedPan, uploadCombinedVoter, uploadCombinedLicense, uploadPassbook
 } = require('../utils/multer');
 
 
@@ -208,6 +208,12 @@ router.put("/agentRestore/:id",auth.checkAdminAuth, adminController.restoreAgent
 // permanent delete agent
 router.delete("/permanentDeleteAgent/:id",auth.checkAdminAuth, adminController.deleteAgent);
 
+// get agents of particular branch
+router.get("/getAgentOfParticularBranch/:branchId",auth.checkAdminAuth, adminController.getAgentOfParticularBranch);
+
+
+
+
 // ###------------ Agent routes ends here---------------
 
 
@@ -308,6 +314,27 @@ router.post('/adminEditApplicantBankInfo/:id', auth.checkAdminAuth, adminControl
 
 // get bank info
 router.get('/adminGetsubmitedApplicantBankInfo/:id', auth.checkAdminAuth, adminController.adminGetSubmitedApplicantBankInfo);
+
+
+router.post('/uploadPassbook',  auth.checkAdminAuth, (req, res, next) => {
+    uploadPassbook.single("passbook")(req, res, (err) => {
+        if (err) {
+            if (err instanceof multer.MulterError) {
+                // MulterError: File too large
+                return res.status(statusCode.BadRequest).send({
+                    message: 'File too large. Maximum file size allowed is 1 MB.'
+                });
+            } else {
+                // Other errors
+                console.error('Multer Error:', err.message);
+                return res.status(statusCode.BadRequest).send({
+                    message: err.message
+                });
+            }
+        }
+        next();
+    });
+},  adminController.uploadPassbook);
 
 
 // ##---- applicant bank details route ends here
@@ -429,7 +456,7 @@ router.post('/adminUploadVoterBackAndFront', auth.checkAdminAuth, (req, res, nex
 }, adminController.adminUpdateVoterBackAndFront);
 
 
-
+    
 // upload driving license back and front of client by admin
 router.post('/adminUploadLicenseBackAndFront', auth.checkAdminAuth, (req, res, next) => {
 
@@ -470,17 +497,40 @@ router.post('/adminfinalSubmitOfLoanForm', auth.checkAdminAuth, adminController.
 
 // ###------- Apply Loan Application by Super Admin and Agent routes ends here
 
-// ###------- Get All Notification list with data and count routes starts here
 
-router.get('/getAllNotifications', auth.checkAdminAuth,adminController.getAllNotificationList);
-
-// ###------- Get All Notification list with data and count routes ends here
-
-
-// ### Assign the Applicant Loan Application to Agent routes starts here-----
+// ###---- List of all applied loan routes starts here--------
+router.get('/getAllLoanApplication', auth.checkAdminAuth, adminController.getAllLoanApplication);
+// ###---- List of all applied loan routes ends here----------
 
 
+
+
+
+
+
+
+// ### Assign the Applicant Loan Application to Agent  by super admin routes starts here-----
 router.post('/adminAssignApplicationToAgent/:loanFormId', auth.checkAdminAuth, adminController.adminAssignApplicantLoanToAgent);
+
+// ### Discard the Applicant Loan Application super admin starts here-----
+router.post('/adminDiscardApplication/:loanFormId', auth.checkAdminAuth, adminController.adminDiscardApplicantLoan);
+
+
+
+// ### verify the Applicant Loan Application by Agent routes starts here-----
+router.post('/agentVerifyApplicantLoanApplication/:loanFormId', auth.checkAdminAuth, adminController.agentVerifyApplicantLonApplication);
+
+// ### Reject the Applicant Loan Application by Agent routes starts here-----
+router.post('/agentRejectApplicantLoanApplication/:loanFormId', auth.checkAdminAuth, adminController.agentRejectApplicantLonApplication);
+
+
+// ### Approve the Applicant Loan Application by super admin routes starts here-----
+router.post('/adminApprovedLoanApplication/:loanFormId', auth.checkAdminAuth, adminController.loanApplicantLoanApprovedBySuperAdmin);
+
+
+
+
+
 
 
 
@@ -494,6 +544,39 @@ router.post('/adminAssignApplicationToAgent/:loanFormId', auth.checkAdminAuth, a
 
 // ### create NOC route
 router.post('/createNoc',auth.checkAdminAuth,adminController.createNocPdf)
+
+
+
+
+// ###------- Get All Notification list with data and count routes starts here
+router.get('/getAllNotifications', auth.checkAdminAuth,adminController.getAllNotificationList);
+// ###------- Get All Notification list with data and count routes ends here
+
+
+
+// payment integration
+
+
+
+// get key
+router.get("/getkey", (req, res) => {
+    return  res.status(200).json({ key: process.env.RZORPAY_KEY_ID })
+ 
+ });
+
+
+// checkout
+router.post('/checout',adminController.checkout);
+
+
+// payment verification
+
+router.post('/paymentVerofication',adminController.paymentVerification);
+
+
+
+
+
 
 
 

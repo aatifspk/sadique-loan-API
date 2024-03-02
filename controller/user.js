@@ -1958,7 +1958,7 @@ exports.finalSubmitOfLoanForm = async (req, res) => {
                         return date.toLocaleString('en-US', options);
                     }
 
-                    const bodyString = `An application for ${fromExist.loanName} has been registered by ${fullName !== "" ? fullName.toUpperCase() : ""} on ${formatCustomDate(new Date())} from ${applicant.city ? applicant?.applicant : ""} `;
+                    const bodyString = `An application for ${fromExist.loanName} has been registered by ${fullName !== "" ? fullName.toUpperCase() : ""} on ${formatCustomDate(new Date())} from ${applicant.city ? applicant?.city : ""} `;
 
                     const dataObject = {
                         header: "New Loan Application Registered.",

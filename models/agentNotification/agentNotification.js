@@ -9,7 +9,7 @@ const agentNotificationScrema = new mongoose.Schema(
         userId: { type: ObjectId, ref: "user" },
 
 
-        head: { type: String, default: null },
+        header: { type: String, default: null },
         body: {type : String, default : null },
         importantId : {type : String, default : null},
         notificationType : {type : Number, required : true},   // 1 for loan form, 2 for verified by agent, 3 for query by user.

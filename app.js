@@ -10,6 +10,7 @@ const Product = require("./models/Product/product")
 const dotnev = require("dotenv");
 dotnev.config();
 const DATABASE_URL = process.env.DATABASE_URL;
+const Razorpay = require('razorpay');
 
 const cityArray = require("./utils/city");
 const stateArray = require("./utils/state");
@@ -33,6 +34,7 @@ app.use("/api", welcomeRouter.router);
 app.use("/api/client", clientRoute.router);
 app.use("/api/admin", adminRoutes.router);
 require("./routes/superAdminNotification")(app);
+require("./routes/roleAndCapability")(app);
 
 // console.log("DATABASE_URL",DATABASE_URL);
 ConnectDb(DATABASE_URL);
@@ -230,6 +232,16 @@ const deleteAllCityData = async () => {
     console.error('Error deleting data:', error);
   }
 };
+
+
+
+// razorpay integration
+const instance = new Razorpay({
+  key_id: process.env.RZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_SECRECT,
+});
+
+module.exports =  instance 
 
 
 // testing push

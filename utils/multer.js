@@ -44,6 +44,10 @@ if(!fs.existsSync('./public/drivingLicense')){
 }
 
 
+// create passbook folder
+if(!fs.existsSync('./public/passbook')){
+    fs.mkdirSync('./public/passbook')
+}
 
 
 
@@ -86,6 +90,26 @@ const uploadProfile = multer({
     fileFilter: imageFilter
 });
 
+
+// upload passbook
+
+const passbookStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/passbook');
+    },
+    filename: async (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname.toLowerCase().replaceAll(' ', '')}`);
+    },
+});
+
+const uploadPassbook = multer({
+    storage: passbookStorage,
+    limits: {
+        fileSize: 1024 * 1024,
+        files: 1
+    },
+    fileFilter: imageFilter
+});
 
 
 // upload photo and signature
@@ -276,3 +300,4 @@ exports.uploadCombinedAdhar = uploadCombinedAdhar;
 exports.uploadCombinedPan = uploadCombinedPan;
 exports.uploadCombinedVoter = uploadCombinedVoter;
 exports.uploadCombinedLicense = uploadCombinedLicense;
+exports.uploadPassbook = uploadPassbook
